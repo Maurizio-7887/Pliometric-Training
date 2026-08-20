@@ -1,0 +1,39 @@
+import type { Exercise, Workout } from './types';
+
+const ex = (id:string,name:string,kind:Exercise['kind'],sets:number,prescription:string,work:number,rest:number,category:string,instructions:string,cues:string[],vest?:string):Exercise => ({id,name,kind,sets,prescription,work,rest,category,instructions,cues,vest});
+const warm = (n=1) => ex('warm','Riscaldamento dinamico','warmup',n,'8 minuti',480,20,'Preparazione','2’ corsa facile; poi mobilità caviglie/anche, skip basso, calciata, affondi dinamici e 3 accelerazioni progressive da 20 m.',['Aumenta gradualmente','Passi leggeri','Mai partire a freddo']);
+const cool = () => ex('cool','Defaticamento','cooldown',1,'5 minuti',300,0,'Recupero','Cammina o corri molto piano, poi respira profondamente. Mobilità dolce di polpacci, quadricipiti e anche; niente stretching forzato.',['Rallenta il respiro','Movimenti dolci','Nessun dolore']);
+
+const library = {
+  pogo:(s=3,r='20 contatti',w=25,rest=45)=>ex('pogo','Pogo jumps','pogo',s,r,w,rest,'Reattività caviglie','Saltelli verticali rapidi quasi senza piegare le ginocchia. Atterra sull’avampiede e riparti subito.',['Caviglia elastica','Corpo alto','Contatto breve']),
+  squat:(s=3,r='6 ripetizioni',w=25,rest=70,vest?:string)=>ex('squat','Squat jump','squat',s,r,w,rest,'Potenza verticale','Scendi in mezzo squat, fermati un istante, esplodi in alto. Atterra morbido e ristabilisci la posizione prima del salto seguente.',['Spingi il terreno','Ginocchia in linea','Atterra silenzioso'],vest),
+  broad:(s=3,r='5 ripetizioni',w=30,rest=75)=>ex('broad','Salto in lungo da fermo','broad',s,r,w,rest,'Potenza orizzontale','Carica anche e braccia, salta avanti. Atterra su entrambi i piedi, stabile; torna camminando.',['Anche indietro','Braccia decise','Blocca l’atterraggio']),
+  lateral:(s=3,r='6+6 ripetizioni',w=35,rest=60)=>ex('lateral','Skater bounds','lateral',s,r,w,rest,'Potenza laterale','Salta lateralmente da una gamba all’altra. Mantieni 1 secondo di equilibrio a ogni atterraggio.',['Bacino stabile','Spingi di lato','Atterra controllato']),
+  split:(s=3,r='5+5 ripetizioni',w=35,rest=75)=>ex('split','Split squat jump','split',s,r,w,rest,'Forza esplosiva','In affondo, salta verticalmente e cambia gamba in aria. Riduci l’ampiezza se perdi controllo.',['Tronco alto','Spinta verticale','Atterra morbido']),
+  bounds:(s=3,r='20 metri',w=25,rest=75)=>ex('bounds','Balzi alternati','bounds',s,r,w,rest,'Falcata potente','Avanza con balzi alternati, spingendo indietro il terreno. Cerca distanza senza allungare eccessivamente il passo.',['Ginocchio avanti','Spinta completa','Ritmo fluido']),
+  feet:(s=4,r='20 secondi',w=20,rest=40)=>ex('feet','Piedi rapidi sulla linea','feet',s,r,w,rest,'Rapidità','Passi piccoli e velocissimi avanti/indietro sopra una linea, busto stabile e braccia attive.',['Passi corti','Resta leggero','Occhi avanti']),
+  lateralFeet:(s=4,r='20 secondi',w=20,rest=40)=>ex('lateralfeet','Piedi rapidi laterali','feet',s,r,w,rest,'Agilità','Supera una linea a destra e sinistra con entrambi i piedi, il più rapidamente possibile senza incrociare.',['Bacino basso','Piedi sotto il corpo','Ritmo costante']),
+  sprint:(s=5,r='20 metri',w=8,rest=75)=>ex('sprint','Accelerazioni 20 m','sprint',s,r,w,rest,'Velocità','Parti inclinato, aumenta la spinta nei primi passi e accelera fino a 20 m. Rientra camminando.',['Spingi indietro','Primi passi potenti','Rilassati veloce']),
+  hill:(s=5,r='8 secondi',w=8,rest=80)=>ex('hill','Sprint breve in salita','sprint',s,r,w,rest,'Accelerazione','Su salita moderata e regolare, sprinta 8 secondi. Recupera tornando a piedi; interrompi se la tecnica cala.',['Corpo inclinato','Braccia forti','Passi reattivi']),
+  calf:(s=3,r='10+10 ripetizioni',w=35,rest=40,vest?:string)=>ex('calf','Calf raise esplosivo monopodalico','calf',s,r,w,rest,'Forza caviglia','Su una gamba, sali rapidamente sulla punta e scendi controllando 2 secondi. Appoggiati leggermente se serve.',['Spingi dall’alluce','Caviglia in asse','Discesa lenta'],vest),
+  powerSkip:(s=3,r='20 metri',w=25,rest=60)=>ex('powerskip','Power skip','bounds',s,r,w,rest,'Potenza e coordinazione','Skip ampio verso l’alto: spingi forte con il piede a terra, ginocchio opposto alto e braccio coordinato.',['Salta verso l’alto','Ginocchio deciso','Atterra sotto il corpo']),
+  tuck:(s=3,r='5 ripetizioni',w=25,rest=80)=>ex('tuck','Tuck jump controllato','squat',s,r,w,rest,'Potenza verticale','Salta e porta le ginocchia verso il petto. Atterra, fermati 2 secondi e riparti solo quando sei stabile.',['Qualità non quantità','Atterra largo','Pausa tra i salti']),
+  decel:(s=4,r='10 m + arresto',w=12,rest=55)=>ex('decel','Accelerazione e arresto','sprint',s,r,w,rest,'Controllo e frenata','Accelera per 10 m, poi frena in 3–4 passi abbassando il baricentro. Non bloccare le ginocchia.',['Frena graduale','Bacino basso','Ginocchia morbide'])
+};
+
+const sessions: Array<[string,string,string,Exercise[]]> = [
+ ['Fondamenta elastiche','Tecnica di atterraggio + potenza verticale','Moderata',[library.pogo(),library.squat(),library.broad(),library.calf(),library.sprint(4,'20 metri',8,80)]],
+ ['Rapidità e laterale','Piedi veloci + stabilità laterale','Moderata',[library.feet(),library.lateral(),library.lateralFeet(),library.decel(),library.powerSkip()]],
+ ['Accelerazione','Spinta orizzontale + velocità','Moderata',[library.pogo(3,'18 contatti'),library.bounds(),library.broad(3,'4 ripetizioni'),library.sprint(),library.calf()]],
+ ['Potenza verticale','Più qualità, stesso controllo','Medio-alta',[library.pogo(4,'20 contatti'),library.squat(4,'6 ripetizioni',25,65),library.tuck(3,'5 ripetizioni'),library.split(3,'4+4 ripetizioni'),library.sprint(4,'20 metri',8,75)]],
+ ['Cambio direzione','Lateralità + frenata','Medio-alta',[library.lateral(4,'6+6 ripetizioni'),library.lateralFeet(5,'20 secondi'),library.feet(4,'25 secondi',25,40),library.decel(5),library.powerSkip(3,'25 metri')]],
+ ['Forza elastica','Balzi + accelerazione','Medio-alta',[library.pogo(4,'22 contatti'),library.bounds(4,'20 metri'),library.broad(4,'5 ripetizioni'),library.hill(5),library.calf(3,'12+12 ripetizioni')]],
+ ['Picco di potenza','Massima esplosività con recuperi pieni','Alta',[library.pogo(4,'20 contatti'),library.squat(4,'5 ripetizioni',25,80,'Opzionale: 3–5% del peso corporeo, solo se esperto e stabile.'),library.tuck(4,'4 ripetizioni'),library.broad(4,'4 ripetizioni'),library.sprint(5,'20 metri',8,90)]],
+ ['Rapidità massima','Frequenza + direzione','Alta',[library.feet(5,'20 secondi'),library.lateralFeet(5,'20 secondi'),library.lateral(4,'5+5 ripetizioni'),library.decel(5,'12 m + arresto'),library.sprint(4,'20 metri',8,85)]],
+ ['Spinta e velocità','Potenza orizzontale + salita','Alta',[library.powerSkip(4,'20 metri'),library.bounds(4,'25 metri'),library.split(3,'5+5 ripetizioni',35,80),library.hill(6,'8 secondi',8,85),library.calf(3,'10+10 ripetizioni',35,45,'Opzionale: 3–5% del peso corporeo.')]],
+ ['Scarico reattivo','Riduzione volume, tecnica brillante','Moderata',[library.pogo(3,'16 contatti'),library.squat(3,'4 ripetizioni',20,70),library.broad(3,'4 ripetizioni'),library.sprint(4,'20 metri',8,90)]],
+ ['Scarico rapidità','Piedi veloci senza affaticamento','Moderata',[library.feet(3,'20 secondi'),library.lateralFeet(3,'20 secondi'),library.lateral(3,'4+4 ripetizioni'),library.decel(3),library.powerSkip(3,'15 metri')]],
+ ['Test qualità','Consolida potenza e velocità','Medio-alta',[library.pogo(3,'18 contatti'),library.broad(3,'3 salti: misura il migliore'),library.squat(3,'5 ripetizioni'),library.sprint(4,'20 metri: rapido ma pulito',8,95),library.calf(2,'10+10 ripetizioni')]]
+];
+
+export const workouts: Workout[] = sessions.map((s,i) => ({ id:`w${Math.floor(i/3)+1}d${i%3+1}`, week:Math.floor(i/3)+1, day:i%3+1, title:s[0], focus:s[1], duration:i>=9?'35–38 min':'38–42 min', intensity:s[2], exercises:[warm(),...s[3],cool()] }));
