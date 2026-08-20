@@ -1,6 +1,6 @@
 # Scatto Forza 30 — PWA
 
-Versione autonoma e installabile dello **Scatto Forza 30**. Include il programma completo di 4 settimane e 12 allenamenti, dimostrazioni animate, timer guidato, segnali acustici e voce italiana. Registra automaticamente allenamento, data, ora di inizio, ora di fine, durata effettiva e stato. Non richiede il runtime Tasklet: progressi e registro sono salvati nel `localStorage` del dispositivo.
+Versione autonoma e installabile dello **Scatto Forza 30**. Include il programma completo di 4 settimane e 12 allenamenti, sagome atletiche professionali con movimenti tecnici fluidi, timer guidato, segnali acustici e voce italiana. Registra automaticamente allenamento, data, ora di inizio, ora di fine, durata effettiva e stato. Non richiede il runtime Tasklet: progressi e registro sono salvati nel `localStorage` del dispositivo.
 
 ## Requisiti
 
