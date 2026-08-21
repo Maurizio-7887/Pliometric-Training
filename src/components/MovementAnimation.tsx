@@ -96,7 +96,7 @@ export const MovementAnimation:React.FC<Props> = ({kind,active=true,id}) => {
   const limb=(a:Point,b:Point,key:string)=><line key={key} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} />;
   const directional=['broad','bounds','sprint'].includes(kind); const markers=['lateral','feet'].includes(kind);
   if (videoPath) {
-    return <div className={`move-stage move-${kind} ${active?'is-moving':''}`} role="img" aria-label={`Video dimostrativo: ${kind}`}>
+    return <div className={`move-stage has-video move-${kind} ${active?'is-moving':''}`} role="img" aria-label={`Video dimostrativo: ${kind}`}>
       <video className="move-video" src={`${import.meta.env.BASE_URL}${videoPath}`} autoPlay={active} loop muted playsInline />
       <span className="move-caption">TECNICA · MOVIMENTO CONTROLLATO</span>
     </div>;
