@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, MapPin, Play, RotateCcw, Timer } from 'lucide-react';
+import { ArrowLeft, MapPin, Music, Play, RotateCcw, Timer } from 'lucide-react';
 import { getSpotifyLink, openSpotify } from '../spotify';
 import { isSpotifyLoggedIn } from '../spotifyAuth';
 import { activateSpotifyElement, playSpotifyLink } from '../spotifyPlayer';
@@ -134,7 +134,7 @@ export const RunIntervals: React.FC<Props> = ({ onExit }) => {
   </div>;
 
   return <div className="space-y-4 max-w-lg mx-auto p-4">
-    <div className="flex justify-between items-center"><button className="btn btn-ghost btn-sm" onClick={stopAll}><ArrowLeft size={18} /> Esci</button><span className="badge badge-outline">Ripetuta {repNo}/{reps}</span></div>
+    <div className="flex justify-between items-center"><button className="btn btn-ghost btn-sm" onClick={stopAll}><ArrowLeft size={18} /> Esci</button><span className="badge badge-outline">Ripetuta {repNo}/{reps}</span>{getSpotifyLink() && <button className="btn btn-ghost btn-sm btn-circle" onClick={openSpotify} aria-label="Apri Spotify"><Music size={18} /></button>}</div>
     {phase === 'running' && <div className="card bg-primary text-primary-content"><div className="card-body items-center text-center p-6 gap-1">
       <span className="text-sm opacity-80">METRI PERCORSI</span>
       <span className="text-6xl font-bold tabular-nums">{Math.round(repDistance)}</span>
