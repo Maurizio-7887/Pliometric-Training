@@ -5,6 +5,7 @@ interface Props { kind: MoveKind; active?: boolean; id?: string; }
 
 const videoMap: Record<string, string> = {
   pogo: 'videos/esercizi/pogo.mp4',
+  squat: 'videos/esercizi/squat.mp4',
   broad: 'videos/esercizi/broad.mp4',
   split: 'videos/esercizi/split.mp4',
   lateral: 'videos/esercizi/lateral.mp4',
