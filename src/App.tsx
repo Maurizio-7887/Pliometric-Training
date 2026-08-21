@@ -6,6 +6,7 @@ import { WorkoutList } from './components/WorkoutList';
 import { WorkoutDetail } from './components/WorkoutDetail';
 import { GuidedTimer } from './components/GuidedTimer';
 import { WorkoutHistory } from './components/WorkoutHistory';
+import { handleSpotifyRedirect } from './spotifyAuth';
 
 type View = 'home' | 'detail' | 'timer';
 const STORAGE_KEY = 'scatto-forza-30-progress';
@@ -37,7 +38,7 @@ export default function App() {
     setLogs(readLogs());
     const next = workouts.find(w => !done.has(w.id));
     if (next) setWeek(next.week);
-    setReady(true);
+    handleSpotifyRedirect().finally(() => setReady(true));
   }, []);
 
   useEffect(() => {
