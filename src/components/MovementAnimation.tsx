@@ -73,13 +73,26 @@ const poses: Record<MoveKind, Pose[]> = {
 };
 const speeds:Record<MoveKind,number>={warmup:1150,pogo:650,squat:1500,broad:1750,lateral:1450,split:1450,bounds:1300,feet:520,sprint:720,calf:1250,cooldown:2000};
 const lerp=(a:number,b:number,t:number)=>a+(b-a)*t;
-const blend=(a:Pose,b:Pose,t:number):Pose=>Object.fromEntries(Object.keys(a).map(k=>[k,[lerp(a[k as keyof Pose][0],b[k as keyof Pose][0],t),lerp(a[k as keyof Pose][1],b[k as keyof Pose][1],t)]])) as unknown as Pose;
+const blend=(a:Pose|undefined,b:Pose|undefined,t:number):Pose=>{
+  if(!a && !b) return stand;
+  if(!a) return b as Pose;
+  if(!b) return a;
+  return Object.fromEntries(Object.keys(a).map(k=>[k,[lerp(a[k as keyof Pose][0],b[k as keyof Pose][0],t),lerp(a[k as keyof Pose][1],b[k as keyof Pose][1],t)]])) as unknown as Pose;
+};
 
 export const MovementAnimation:React.FC<Props> = ({kind,active=true,id}) => {
   const videoPath = id ? videoMap[id] : undefined;
   const [clock,setClock]=useState(0);
   useEffect(()=>{ if(!active){setClock(0);return;} let raf=0; const start=performance.now(); const tick=(now:number)=>{setClock(now-start);raf=requestAnimationFrame(tick)}; raf=requestAnimationFrame(tick); return()=>cancelAnimationFrame(raf); },[active,kind]);
-  const pose=useMemo(()=>{const list=poses[kind];const progress=(clock%speeds[kind])/speeds[kind]*list.length;const i=Math.floor(progress)%list.length;const t=(1-Math.cos((progress-i)*Math.PI))/2;return blend(list[i],list[(i+1)%list.length],t)},[clock,kind]);
+  const pose=useMemo(()=>{
+    const list=poses[kind]&&poses[kind].length?poses[kind]:poses.warmup;
+    const dur=speeds[kind]||1000;
+    const safeClock=Number.isFinite(clock)&&clock>0?clock:0;
+    const progress=(safeClock%dur)/dur*list.length;
+    const i=((Math.floor(progress)%list.length)+list.length)%list.length;
+    const t=(1-Math.cos((progress-Math.floor(progress))*Math.PI))/2;
+    return blend(list[i],list[(i+1)%list.length],t);
+  },[clock,kind]);
   const limb=(a:Point,b:Point,key:string)=><line key={key} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} />;
   const directional=['broad','bounds','sprint'].includes(kind); const markers=['lateral','feet'].includes(kind);
   if (videoPath) {
