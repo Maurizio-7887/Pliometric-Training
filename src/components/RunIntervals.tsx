@@ -1,5 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, MapPin, Play, RotateCcw, Timer } from 'lucide-react';
+import { getSpotifyLink, openSpotify } from '../spotify';
+import { isSpotifyLoggedIn } from '../spotifyAuth';
+import { activateSpotifyElement, playSpotifyLink } from '../spotifyPlayer';
 
 const say = (text: string) => { if (!('speechSynthesis' in window)) return; window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.lang = 'it-IT'; u.rate = .98; u.volume = 1; window.speechSynthesis.speak(u); };
 
@@ -121,7 +124,7 @@ export const RunIntervals: React.FC<Props> = ({ onExit }) => {
     </div></div>
     <div className="alert bg-base-200 text-sm"><MapPin size={20} /><span>Serve il GPS attivo e il permesso di localizzazione al browser. Tienilo acceso per tutta la sessione, anche a schermo bloccato se possibile.</span></div>
     {gpsError && <div className="alert alert-error text-sm">{gpsError}</div>}
-    <button className="btn btn-primary btn-lg w-full" onClick={() => startRep(1)}><Play fill="currentColor" /> INIZIA LA SERIE</button>
+    <button className="btn btn-primary btn-lg w-full" onClick={() => { activateSpotifyElement(); if (isSpotifyLoggedIn()) { playSpotifyLink(getSpotifyLink()).then(ok => { if (!ok) openSpotify(); }); } else { openSpotify(); } startRep(1); }}><Play fill="currentColor" /> INIZIA LA SERIE</button>
   </div>;
 
   if (phase === 'done') return <div className="space-y-4 max-w-lg mx-auto p-4">
