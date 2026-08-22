@@ -64,6 +64,11 @@ export async function isSpotifyPlayerAvailable(): Promise<boolean> {
   return !!token;
 }
 
+/** Prepara in anticipo il lettore, senza avviare la musica. */
+export async function prepareSpotifyPlayer(): Promise<boolean> {
+  return !!(await ensurePlayerReady());
+}
+
 function playlistToUri(link: string): string | null {
   const m = link.match(/(playlist|album|track)\/([a-zA-Z0-9]+)/);
   if (!m) return null;

@@ -6,6 +6,7 @@ import { WorkoutDetail } from './components/WorkoutDetail';
 import { GuidedTimer } from './components/GuidedTimer';
 import { WorkoutHistory } from './components/WorkoutHistory';
 import { RunIntervals } from './components/RunIntervals';
+import { MovementAnimation } from './components/MovementAnimation';
 import { handleSpotifyRedirect } from './spotifyAuth';
 
 type View = 'home' | 'plyo' | 'detail' | 'timer' | 'history' | 'run';
@@ -94,7 +95,10 @@ export default function App() {
       <div><div className="flex justify-between text-sm"><span>{doneCount}/{workouts.length} completati</span><span>{progress}%</span></div><progress className="progress w-full" value={progress} max="100" /></div>
     </div></section>
     {allComplete ? <section className="card bg-base-200"><div className="card-body p-5 text-center space-y-3"><CheckCircle2 size={52} className="mx-auto text-success" /><h2 className="text-2xl font-bold">Programma completato</h2><p>Hai terminato tutte le sedute previste.</p></div></section>
-      : <button className="next-plyo-card card bg-base-200 w-full text-left border border-primary/30" onClick={() => open(nextWorkout)}><div className="card-body p-5"><div className="flex items-center justify-between gap-3"><div><span className="badge badge-secondary">SEDUTA SBLOCCATA</span><h2 className="font-bold text-2xl mt-2">S{nextWorkout.week} · G{nextWorkout.day}</h2><h3 className="font-semibold text-lg">{nextWorkout.title}</h3><p className="text-sm text-base-content/60 mt-1">{nextWorkout.duration} · {nextWorkout.focus}</p></div><span className="btn btn-primary btn-circle"><Zap /></span></div></div></button>}
+      : <button className="next-plyo-card card bg-base-200 w-full text-left border border-primary/30" onClick={() => open(nextWorkout)}>
+        <div className="plyo-preview-video" aria-hidden="true"><MovementAnimation kind={nextWorkout.exercises.find(e => ['pogo','squat','broad','lateral','lateralfeet','split','bounds','feet','sprint','calf'].includes(e.id))?.kind ?? 'warmup'} active id={nextWorkout.exercises.find(e => ['pogo','squat','broad','lateral','lateralfeet','split','bounds','feet','sprint','calf'].includes(e.id))?.id} showFullscreen={false} /></div>
+        <div className="card-body plyo-next-copy"><div className="flex items-center justify-between gap-3"><div><span className="badge badge-secondary">SEDUTA SBLOCCATA</span><h2 className="font-bold text-2xl mt-2">S{nextWorkout.week} · G{nextWorkout.day}</h2><h3 className="font-semibold text-lg">{nextWorkout.title}</h3><p className="text-sm text-base-content/60 mt-1">{nextWorkout.duration} · {nextWorkout.focus}</p></div><span className="btn btn-primary btn-circle plyo-open"><Zap /></span></div></div>
+      </button>}
     <div className="alert alert-warning text-sm"><Info size={18} /> La seduta successiva si sblocca solo dopo aver completato quella corrente. Mantieni almeno 48 ore di recupero.</div>
   </main>;
 

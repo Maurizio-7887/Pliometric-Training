@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { MoveKind } from '../types';
 
-interface Props { kind: MoveKind; active?: boolean; id?: string; }
+interface Props { kind: MoveKind; active?: boolean; id?: string; showFullscreen?: boolean; }
 type Point = [number, number];
 type Pose = { head: Point; shoulder: Point; hip: Point; le: Point; lw: Point; re: Point; rw: Point; lk: Point; la: Point; rk: Point; ra: Point };
 
@@ -86,7 +86,7 @@ const professionalVideos: Record<string, {src:string; label:string; aria:string}
   calf:{src:'./videos/calf-raise-esplosivo-monopodalico.mp4',label:'TECNICA · CALF RAISE MONOPODALICO',aria:'Video professionale: calf raise esplosivo monopodalico'}
 };
 
-export const MovementAnimation:React.FC<Props> = ({kind,active=true,id}) => {
+export const MovementAnimation:React.FC<Props> = ({kind,active=true,id,showFullscreen=true}) => {
   const [clock,setClock]=useState(0);
   const videoRef=useRef<HTMLVideoElement>(null);
   useEffect(()=>{ if(!active){setClock(0);return;} let raf=0; const start=performance.now(); const tick=(now:number)=>{setClock(now-start);raf=requestAnimationFrame(tick)}; raf=requestAnimationFrame(tick); return()=>cancelAnimationFrame(raf); },[active,kind]);
@@ -105,7 +105,7 @@ export const MovementAnimation:React.FC<Props> = ({kind,active=true,id}) => {
   };
   if(demo)return <div className={`move-stage move-video ${active?'is-moving':''}`} role="group" aria-label={demo.aria}>
     <video ref={videoRef} src={demo.src} autoPlay={active} loop muted playsInline preload="auto" />
-    <button type="button" className="video-fullscreen" onClick={openFullscreen} aria-label="Guarda il video a schermo intero">⛶ SCHERMO INTERO</button>
+    {showFullscreen && <button type="button" className="video-fullscreen" onClick={openFullscreen} aria-label="Guarda il video a schermo intero">⛶ SCHERMO INTERO</button>}
     <span className="move-caption">{demo.label}</span>
   </div>;
   const limb=(a:Point,b:Point,key:string)=><line key={key} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} />;

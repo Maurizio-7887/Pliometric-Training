@@ -46,3 +46,57 @@ html { scroll-behavior: smooth; width: 100%; min-width: 100%; } body { min-heigh
   .guided-timer .card-body{padding:.75rem}
 }
 @media (max-width:360px){.text-7xl{font-size:3.7rem}}
+
+/* Slide Pliometria: usa lo spazio con una vera anteprima video e testi leggibili. */
+.next-plyo-card{display:flex;flex-direction:column;padding:0!important}
+.plyo-preview-video{flex:1;min-height:220px;overflow:hidden;background:#171717}
+.plyo-preview-video .move-stage{height:100%!important;min-height:220px;border:0;border-radius:0}
+.plyo-next-copy{flex:0 0 auto;padding:1rem!important}
+.plyo-open{width:3.25rem;height:3.25rem;flex:0 0 auto}
+
+/* Timer guidato: niente grande area morta tra timer e START. */
+.guided-main-body{gap:.75rem;justify-content:flex-start}
+.guided-main-body>div{width:100%}
+.guided-main-body>.move-stage{width:100%;max-width:46rem}
+.guided-controls{margin-top:.1rem}
+.guided-start{min-height:4.25rem;font-size:1.2rem;border-radius:.55rem}
+
+@media (max-width:640px){
+  .plyo-shell>section.card .card-body{padding:.7rem!important}
+  .plyo-shell>section.card h1{font-size:1.25rem;line-height:1.1;margin:.2rem 0}
+  .plyo-preview-video{min-height:36dvh}
+  .plyo-preview-video .move-stage{min-height:36dvh}
+  .plyo-next-copy h2{font-size:1.55rem}
+  .plyo-next-copy h3{font-size:1.1rem}
+  .plyo-next-copy p{font-size:.86rem}
+  .guided-main-body{padding:.75rem!important}
+  .guided-main-body h2{font-size:1.55rem;margin-top:.45rem}
+  .guided-main-body>.move-stage{height:min(32dvh,250px)}
+  .guided-main-body .text-7xl{font-size:4.35rem;line-height:1}
+}
+
+/* Anche se sul telefono è attiva la visualizzazione desktop, resta una UI mobile leggibile. */
+@media (hover:none) and (pointer:coarse) and (min-width:641px){
+  .plyo-shell>section.card .card-body{padding:1rem 1.4rem!important}
+  .plyo-shell>section.card h1{font-size:2.2rem;line-height:1.1;margin:.35rem 0}
+  .plyo-shell>section.card,.plyo-shell>.alert{font-size:1.25rem}
+  .plyo-preview-video{min-height:42dvh}
+  .plyo-preview-video .move-stage{min-height:42dvh}
+  .plyo-next-copy{padding:1.35rem 1.5rem!important}
+  .plyo-next-copy h2{font-size:2.5rem}
+  .plyo-next-copy h3{font-size:1.8rem}
+  .plyo-next-copy p{font-size:1.25rem}
+  .plyo-next-copy .badge{font-size:1rem}
+  .plyo-open{width:4.5rem;height:4.5rem}
+  .guided-timer{gap:.8rem}
+  .guided-timer>.flex:first-child{font-size:1.3rem}
+  .guided-main-body{padding:1.25rem!important;gap:1rem}
+  .guided-main-body .badge{font-size:1.1rem}
+  .guided-main-body h2{font-size:2.5rem;margin-top:.6rem}
+  .guided-main-body p{font-size:1.25rem}
+  .guided-main-body>.move-stage{height:min(43dvh,460px)}
+  .guided-main-body .text-7xl{font-size:7rem;line-height:1}
+  .guided-controls .btn{min-height:5.25rem}
+  .guided-start{font-size:2rem}
+  .guided-timer>p:last-child{font-size:1rem}
+}
