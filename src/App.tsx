@@ -86,7 +86,7 @@ export default function App() {
   if (view === 'history') return <main className="app-shell w-full p-3 space-y-4"><button className="btn btn-ghost btn-sm" onClick={() => setView('home')}><ArrowLeft size={18} /> Home</button><WorkoutHistory logs={logs} onClear={() => { if (window.confirm('Cancellare tutto il registro e i progressi salvati? Non si può annullare.')) { setLogs([]); setCompleted(new Set()); } }} /></main>;
   if (view === 'run') return <RunIntervals onExit={() => setView('home')} />;
 
-  if (view === 'plyo') return <main className="app-shell w-full p-3 pb-10 space-y-4">
+  if (view === 'plyo') return <main className="app-shell plyo-shell w-full p-3 pb-10">
     <button className="btn btn-ghost btn-sm" onClick={() => setView('home')}><ArrowLeft size={18} /> Home</button>
     <section className="card bg-primary text-primary-content"><div className="card-body p-4">
       <span className="badge">PLIOMETRIA PROGRESSIVA</span>

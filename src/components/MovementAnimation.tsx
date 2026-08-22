@@ -68,7 +68,20 @@ const speeds:Record<MoveKind,number>={warmup:1150,pogo:650,squat:1500,broad:1750
 const lerp=(a:number,b:number,t:number)=>a+(b-a)*t;
 const blend=(a:Pose,b:Pose,t:number):Pose=>Object.fromEntries(Object.keys(a).map(k=>[k,[lerp(a[k as keyof Pose][0],b[k as keyof Pose][0],t),lerp(a[k as keyof Pose][1],b[k as keyof Pose][1],t)]])) as unknown as Pose;
 
-export const MovementAnimation:React.FC<Props> = ({kind,active=true}) => {
+const professionalVideos: Record<string, {src:string; label:string; aria:string}> = {
+  pogo:{src:'./videos/esercizi/pogo.mp4',label:'TECNICA · POGO JUMPS',aria:'Video professionale: pogo jumps'},
+  squat:{src:'./videos/esercizi/squat.mp4',label:'TECNICA · SQUAT JUMP',aria:'Video professionale: squat jump'},
+  broad:{src:'./videos/esercizi/broad.mp4',label:'TECNICA · SALTO IN LUNGO',aria:'Video professionale: salto in lungo da fermo'},
+  lateral:{src:'./videos/esercizi/lateral.mp4',label:'TECNICA · SKATER BOUNDS',aria:'Video professionale: skater bounds'},
+  lateralfeet:{src:'./videos/esercizi/lateralfeet.mp4',label:'TECNICA · PIEDI RAPIDI LATERALI',aria:'Video professionale: piedi rapidi laterali'},
+  split:{src:'./videos/esercizi/split.mp4',label:'TECNICA · SPLIT SQUAT JUMP',aria:'Video professionale: split squat jump'},
+  bounds:{src:'./videos/balzi-alternati-bounding.mp4',label:'TECNICA · BALZI ALTERNATI',aria:'Video professionale: balzi alternati bounding'},
+  feet:{src:'./videos/piedi-rapidi-quick-feet.mp4',label:'TECNICA · PIEDI RAPIDI',aria:'Video professionale: piedi rapidi quick feet'},
+  sprint:{src:'./videos/accelerazione-sprint.mp4',label:'TECNICA · ACCELERAZIONE SPRINT',aria:'Video professionale: accelerazione sprint'},
+  calf:{src:'./videos/calf-raise-esplosivo-monopodalico.mp4',label:'TECNICA · CALF RAISE MONOPODALICO',aria:'Video professionale: calf raise esplosivo monopodalico'}
+};
+
+export const MovementAnimation:React.FC<Props> = ({kind,active=true,id}) => {
   const [clock,setClock]=useState(0);
   const videoRef=useRef<HTMLVideoElement>(null);
   useEffect(()=>{ if(!active){setClock(0);return;} let raf=0; const start=performance.now(); const tick=(now:number)=>{setClock(now-start);raf=requestAnimationFrame(tick)}; raf=requestAnimationFrame(tick); return()=>cancelAnimationFrame(raf); },[active,kind]);
@@ -78,13 +91,7 @@ export const MovementAnimation:React.FC<Props> = ({kind,active=true}) => {
     if(active)video.play().catch(()=>{}); else video.pause();
   },[active,kind]);
   const pose=useMemo(()=>{const list=poses[kind];const progress=(clock%speeds[kind])/speeds[kind]*list.length;const i=Math.floor(progress)%list.length;const t=(1-Math.cos((progress-i)*Math.PI))/2;return blend(list[i],list[(i+1)%list.length],t)},[clock,kind]);
-  const videoDemo:Partial<Record<MoveKind,{src:string;label:string;aria:string}>>={
-    bounds:{src:'./videos/balzi-alternati-bounding.mp4',label:'TECNICA · BALZI ALTERNATI',aria:'Dimostrazione tecnica video: balzi alternati bounding'},
-    feet:{src:'./videos/piedi-rapidi-quick-feet.mp4',label:'TECNICA · PIEDI RAPIDI',aria:'Dimostrazione tecnica video: piedi rapidi quick feet'},
-    sprint:{src:'./videos/accelerazione-sprint.mp4',label:'TECNICA · ACCELERAZIONE SPRINT',aria:'Dimostrazione tecnica video: accelerazione sprint'},
-    calf:{src:'./videos/calf-raise-esplosivo-monopodalico.mp4',label:'TECNICA · CALF RAISE MONOPODALICO',aria:'Dimostrazione tecnica video: calf raise esplosivo monopodalico'}
-  };
-  const demo=videoDemo[kind];
+  const demo=id ? professionalVideos[id] : undefined;
   if(demo)return <div className={`move-stage move-video ${active?'is-moving':''}`} role="img" aria-label={demo.aria}>
     <video ref={videoRef} src={demo.src} autoPlay={active} loop muted playsInline preload="metadata" />
     <span className="move-caption">{demo.label}</span>

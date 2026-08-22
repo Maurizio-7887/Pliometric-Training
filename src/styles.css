@@ -3,8 +3,8 @@ html { scroll-behavior: smooth; width: 100%; min-width: 100%; } body { min-heigh
 .home-header { padding: .6rem .25rem 0; }
 .home-header h1 { margin: .6rem 0 .15rem; font-size: clamp(1.65rem, 5vw, 2.8rem); line-height: 1.05; font-weight: 900; }
 .home-header p { margin: 0; color: color-mix(in srgb,var(--color-base-content) 60%,transparent); }
-.home-choice-grid { display: grid; grid-template-columns: 1fr; gap: .85rem; }
-.home-choice { width: 100%; min-height: clamp(9.5rem, 27vw, 16rem); border: 0; border-radius: .85rem; padding: clamp(1.15rem, 4vw, 2.5rem); display: flex; align-items: center; gap: clamp(1rem, 4vw, 2.5rem); text-align: left; color: #fff; box-shadow: 0 5px 18px rgba(0,0,0,.14); }
+.home-choice-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr; grid-template-rows: repeat(2,minmax(0,1fr)); gap: .65rem; }
+.home-choice { width: 100%; min-height: 0; border: 0; border-radius: .7rem; padding: clamp(1.15rem, 4vw, 2.5rem); display: flex; align-items: center; gap: clamp(1rem, 4vw, 2.5rem); text-align: left; color: #fff; box-shadow: 0 5px 18px rgba(0,0,0,.14); }
 .home-choice-run { background: linear-gradient(135deg,#305f85,#4387ad); }
 .home-choice-plyo { background: linear-gradient(135deg,#3f7143,#5b965c); }
 .home-choice > svg { flex: 0 0 auto; width: clamp(3.2rem, 10vw, 6rem); height: clamp(3.2rem, 10vw, 6rem); }
@@ -12,6 +12,8 @@ html { scroll-behavior: smooth; width: 100%; min-width: 100%; } body { min-heigh
 .home-choice strong { font-size: clamp(1.6rem, 6vw, 3.6rem); line-height: 1; letter-spacing: .02em; }
 .home-choice small { font-size: clamp(.9rem, 2.7vw, 1.35rem); line-height: 1.25; opacity: .88; }
 .home-secondary-actions { margin-top: auto; display: grid; gap: .55rem; }
+.plyo-shell { min-height: 100dvh; display: flex; flex-direction: column; gap: .65rem; }
+.plyo-shell > .next-plyo-card { flex: 1; min-height: 14rem; }
 .next-plyo-card { min-height: 12rem; }
 .start-guided-dock { left: 50%; bottom: max(4.5rem, env(safe-area-inset-bottom)); width: min(calc(100% - 2rem), 32rem); padding: .75rem; border-radius: .75rem; transform: translateX(-50%); box-shadow: 0 8px 28px rgba(0,0,0,.22); } @media (max-width: 640px), (hover: none) and (pointer: coarse) { .app-shell { width: 100vw; max-width: none; margin-left: 0; margin-right: 0; padding-left: .55rem; padding-right: .55rem; } .start-guided-dock { width: calc(100vw - 1.1rem); bottom: max(4.5rem, env(safe-area-inset-bottom)); } .card-body { padding-left: .9rem; padding-right: .9rem; } } button { touch-action: manipulation; font: inherit; cursor: pointer; } * { box-sizing: border-box; }
 :root { color-scheme: light; --color-base-100:#f5f5f5; --color-base-200:#eaeaea; --color-base-300:#dfdfdf; --color-base-content:#121215; --color-primary:#4e814e; --color-primary-content:#f5f5f5; --color-secondary:#676caa; --color-secondary-content:#121215; --color-success:#4e814e; --color-warning:#b8860b; }
@@ -22,4 +24,25 @@ html { scroll-behavior: smooth; width: 100%; min-width: 100%; } body { min-heigh
 .move-stage{position:relative;width:100%;height:180px;border-radius:1rem;overflow:hidden;background:linear-gradient(155deg,color-mix(in srgb,currentColor 4%,transparent),color-mix(in srgb,var(--color-primary) 13%,transparent));color:currentColor;border:1px solid color-mix(in srgb,currentColor 9%,transparent)}
 .move-stage svg{display:block;width:100%;height:160px;overflow:visible}.move-video{background:#f6f1e8}.move-video video{display:block;width:100%;height:100%;object-fit:cover}.move-video .move-caption{bottom:8px;width:max-content;max-width:calc(100% - 16px);margin:auto;padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.82);color:#17233b;opacity:.9;box-shadow:0 2px 10px rgba(0,0,0,.08)}.pro-ground{stroke-width:3}.pro-shadow{fill:currentColor;opacity:.11}.pro-athlete{color:var(--color-primary)}.pro-athlete line{stroke:currentColor;stroke-width:11;stroke-linecap:round;stroke-linejoin:round}.pro-athlete .pro-back{opacity:.48}.pro-torso,.pro-head,.pro-joint{fill:currentColor}.pro-torso{opacity:.94}.pro-head{stroke:color-mix(in srgb,currentColor 70%,#000);stroke-width:1}.pro-foot{fill:none;stroke:currentColor;stroke-width:8;stroke-linecap:round}.pro-markers{stroke:var(--color-secondary);stroke-width:4;stroke-linecap:round;opacity:.7}.pro-direction{fill:none;stroke:var(--color-secondary);stroke-width:4;stroke-linecap:round;stroke-linejoin:round;opacity:.65}.move-caption{position:absolute;left:0;right:0;bottom:10px;text-align:center;font-size:.62rem;letter-spacing:.12em;font-weight:800;opacity:.48}.move-stage.is-moving .pro-shadow{animation:shadow-pulse 1s ease-in-out infinite}.move-feet.is-moving .pro-shadow{animation-duration:.4s}.move-pogo.is-moving .pro-shadow{animation-duration:.65s}.move-stage:not(.is-moving)::after{content:'IN PAUSA';position:absolute;inset:0;display:grid;place-items:center;background:color-mix(in srgb,var(--color-base-100) 48%,transparent);font-size:.72rem;font-weight:900;letter-spacing:.12em}.move-cooldown .pro-athlete,.move-warmup .pro-athlete{color:var(--color-secondary)}
 @keyframes shadow-pulse{0%,100%{transform:scaleX(1);transform-origin:center;opacity:.12}50%{transform:scaleX(.62);transform-origin:center;opacity:.06}}@keyframes spin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){.figure,.figure *{animation-duration:2s!important}} @media (max-width:360px){.text-7xl{font-size:3.7rem}}
+@media (prefers-reduced-motion:reduce){.figure,.figure *{animation-duration:2s!important}}
+@media (max-width:640px){
+  .app-shell{padding:.35rem!important}
+  .home-shell{height:100dvh;min-height:100dvh;gap:.45rem;padding-bottom:.35rem!important}
+  .home-header{padding:.15rem .1rem 0}
+  .home-header h1{margin:.25rem 0 .05rem;font-size:1.55rem}
+  .home-header p{font-size:.83rem}
+  .home-choice-grid{gap:.45rem}
+  .home-choice{border-radius:.55rem;padding:.9rem;gap:.8rem}
+  .home-choice > svg{width:3.35rem;height:3.35rem}
+  .home-choice strong{font-size:clamp(1.75rem,9vw,2.45rem)}
+  .home-choice small{font-size:.92rem;line-height:1.2}
+  .home-secondary-actions{gap:.25rem;margin-top:0}
+  .home-secondary-actions .btn{min-height:2.2rem}
+  .plyo-shell{padding:.35rem!important;gap:.45rem}
+  .plyo-shell .card-body{padding:1rem}
+  .plyo-shell > .next-plyo-card{min-height:15rem}
+  .guided-timer{gap:.5rem}
+  .guided-timer .move-stage{height:min(29dvh,220px)}
+  .guided-timer .card-body{padding:.75rem}
+}
+@media (max-width:360px){.text-7xl{font-size:3.7rem}}
