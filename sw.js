@@ -1,4 +1,4 @@
-const CACHE = 'scatto-forza-30-v9-video-fullscreen';
+const CACHE = 'scatto-forza-30-v10-video-layout-spotify';
 const APP_SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
