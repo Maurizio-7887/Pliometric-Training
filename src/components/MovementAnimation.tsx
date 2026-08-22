@@ -97,8 +97,15 @@ export const MovementAnimation:React.FC<Props> = ({kind,active=true,id}) => {
   },[active,kind]);
   const pose=useMemo(()=>{const list=poses[kind]?.length?poses[kind]:poses.warmup;const duration=speeds[kind]||1000;const safeClock=Number.isFinite(clock)&&clock>0?clock:0;const progress=(safeClock%duration)/duration*list.length;const i=((Math.floor(progress)%list.length)+list.length)%list.length;const t=(1-Math.cos((progress-Math.floor(progress))*Math.PI))/2;return blend(list[i],list[(i+1)%list.length],t)},[clock,kind]);
   const demo=id ? professionalVideos[id] : undefined;
-  if(demo)return <div className={`move-stage move-video ${active?'is-moving':''}`} role="img" aria-label={demo.aria}>
-    <video ref={videoRef} src={demo.src} autoPlay={active} loop muted playsInline preload="metadata" />
+  const openFullscreen=()=>{
+    const video=videoRef.current as (HTMLVideoElement & {webkitEnterFullscreen?:()=>void}) | null;
+    if(!video)return;
+    if(video.requestFullscreen)void video.requestFullscreen();
+    else video.webkitEnterFullscreen?.();
+  };
+  if(demo)return <div className={`move-stage move-video ${active?'is-moving':''}`} role="group" aria-label={demo.aria}>
+    <video ref={videoRef} src={demo.src} autoPlay={active} loop muted playsInline preload="auto" />
+    <button type="button" className="video-fullscreen" onClick={openFullscreen} aria-label="Guarda il video a schermo intero">⛶ SCHERMO INTERO</button>
     <span className="move-caption">{demo.label}</span>
   </div>;
   const limb=(a:Point,b:Point,key:string)=><line key={key} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} />;
