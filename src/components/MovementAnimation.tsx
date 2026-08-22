@@ -1,16 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { MoveKind } from '../types';
 
-interface Props { kind: MoveKind; active?: boolean; id?: string; }
-
-const videoMap: Record<string, string> = {
-  pogo: 'videos/esercizi/pogo.mp4',
-  squat: 'videos/esercizi/squat.mp4',
-  broad: 'videos/esercizi/broad.mp4',
-  split: 'videos/esercizi/split.mp4',
-  lateral: 'videos/esercizi/lateral.mp4',
-  lateralfeet: 'videos/esercizi/lateralfeet.mp4'
-};
+interface Props { kind: MoveKind; active?: boolean; }
 type Point = [number, number];
 type Pose = { head: Point; shoulder: Point; hip: Point; le: Point; lw: Point; re: Point; rw: Point; lk: Point; la: Point; rk: Point; ra: Point };
 
@@ -75,34 +66,24 @@ const poses: Record<MoveKind, Pose[]> = {
 };
 const speeds:Record<MoveKind,number>={warmup:1150,pogo:650,squat:1500,broad:1750,lateral:1450,split:1450,bounds:1300,feet:520,sprint:720,calf:1250,cooldown:2000};
 const lerp=(a:number,b:number,t:number)=>a+(b-a)*t;
-const blend=(a:Pose|undefined,b:Pose|undefined,t:number):Pose=>{
-  if(!a && !b) return stand;
-  if(!a) return b as Pose;
-  if(!b) return a;
-  return Object.fromEntries(Object.keys(a).map(k=>[k,[lerp(a[k as keyof Pose][0],b[k as keyof Pose][0],t),lerp(a[k as keyof Pose][1],b[k as keyof Pose][1],t)]])) as unknown as Pose;
-};
+const blend=(a:Pose,b:Pose,t:number):Pose=>Object.fromEntries(Object.keys(a).map(k=>[k,[lerp(a[k as keyof Pose][0],b[k as keyof Pose][0],t),lerp(a[k as keyof Pose][1],b[k as keyof Pose][1],t)]])) as unknown as Pose;
 
-export const MovementAnimation:React.FC<Props> = ({kind,active=true,id}) => {
-  const videoPath = id ? videoMap[id] : undefined;
+export const MovementAnimation:React.FC<Props> = ({kind,active=true}) => {
   const [clock,setClock]=useState(0);
+  const videoRef=useRef<HTMLVideoElement>(null);
   useEffect(()=>{ if(!active){setClock(0);return;} let raf=0; const start=performance.now(); const tick=(now:number)=>{setClock(now-start);raf=requestAnimationFrame(tick)}; raf=requestAnimationFrame(tick); return()=>cancelAnimationFrame(raf); },[active,kind]);
-  const pose=useMemo(()=>{
-    const list=poses[kind]&&poses[kind].length?poses[kind]:poses.warmup;
-    const dur=speeds[kind]||1000;
-    const safeClock=Number.isFinite(clock)&&clock>0?clock:0;
-    const progress=(safeClock%dur)/dur*list.length;
-    const i=((Math.floor(progress)%list.length)+list.length)%list.length;
-    const t=(1-Math.cos((progress-Math.floor(progress))*Math.PI))/2;
-    return blend(list[i],list[(i+1)%list.length],t);
-  },[clock,kind]);
+  useEffect(()=>{
+    const video=videoRef.current;
+    if(!video)return;
+    if(active)video.play().catch(()=>{}); else video.pause();
+  },[active,kind]);
+  const pose=useMemo(()=>{const list=poses[kind];const progress=(clock%speeds[kind])/speeds[kind]*list.length;const i=Math.floor(progress)%list.length;const t=(1-Math.cos((progress-i)*Math.PI))/2;return blend(list[i],list[(i+1)%list.length],t)},[clock,kind]);
+  if(kind==='bounds')return <div className={`move-stage move-video ${active?'is-moving':''}`} role="img" aria-label="Dimostrazione tecnica video: balzi alternati bounding">
+    <video ref={videoRef} src="./videos/balzi-alternati-bounding.mp4" autoPlay={active} loop muted playsInline preload="metadata" />
+    <span className="move-caption">TECNICA · BALZI ALTERNATI</span>
+  </div>;
   const limb=(a:Point,b:Point,key:string)=><line key={key} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} />;
   const directional=['broad','bounds','sprint'].includes(kind); const markers=['lateral','feet'].includes(kind);
-  if (videoPath) {
-    return <div className={`move-stage has-video move-${kind} ${active?'is-moving':''}`} role="img" aria-label={`Video dimostrativo: ${kind}`}>
-      <video className="move-video" src={`${import.meta.env.BASE_URL}${videoPath}`} autoPlay={active} loop muted playsInline />
-      <span className="move-caption">TECNICA · MOVIMENTO CONTROLLATO</span>
-    </div>;
-  }
   return <div className={`move-stage move-${kind} ${active?'is-moving':''}`} role="img" aria-label={`Dimostrazione tecnica animata: ${kind}`}>
     <svg viewBox="0 0 320 180" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       <defs><linearGradient id={`floor-${kind}`} x1="0" x2="1"><stop stopColor="currentColor" stopOpacity="0"/><stop offset=".5" stopColor="currentColor" stopOpacity=".24"/><stop offset="1" stopColor="currentColor" stopOpacity="0"/></linearGradient></defs>
