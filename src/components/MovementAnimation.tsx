@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { MoveKind } from '../types';
 
-interface Props { kind: MoveKind; active?: boolean; }
+interface Props { kind: MoveKind; active?: boolean; id?: string; }
 type Point = [number, number];
 type Pose = { head: Point; shoulder: Point; hip: Point; le: Point; lw: Point; re: Point; rw: Point; lk: Point; la: Point; rk: Point; ra: Point };
 
