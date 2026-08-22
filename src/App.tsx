@@ -84,12 +84,12 @@ export default function App() {
   const nextWorkout = useMemo(() => workouts.find(w => !completed.has(w.id)) ?? workouts[11], [completed]);
 
   if (!ready) return <div className="h-screen flex items-center justify-center"><span className="loading loading-spinner loading-lg text-primary" /></div>;
-  if (view === 'timer' && selected) return <main className="max-w-lg mx-auto p-4"><GuidedTimer workout={selected} onExit={() => setView('detail')} onStart={startSession} onComplete={completeSession} /></main>;
-  if (view === 'detail' && selected) return <main className="max-w-lg mx-auto p-4"><WorkoutDetail workout={selected} onBack={() => setView('home')} onStart={() => setView('timer')} /></main>;
-  if (view === 'history') return <main className="max-w-lg mx-auto p-4 space-y-4"><button className="btn btn-ghost btn-sm" onClick={() => setView('home')}><ArrowLeft size={18} /> Programma</button><WorkoutHistory logs={logs} onClear={() => { if (window.confirm('Cancellare tutto il registro e i progressi salvati? Non si può annullare.')) { setLogs([]); setCompleted(new Set()); } }} /></main>;
+  if (view === 'timer' && selected) return <main className="app-shell max-w-lg mx-auto p-4"><GuidedTimer workout={selected} onExit={() => setView('detail')} onStart={startSession} onComplete={completeSession} /></main>;
+  if (view === 'detail' && selected) return <main className="app-shell max-w-lg mx-auto p-4"><WorkoutDetail workout={selected} onBack={() => setView('home')} onStart={() => setView('timer')} /></main>;
+  if (view === 'history') return <main className="app-shell max-w-lg mx-auto p-4 space-y-4"><button className="btn btn-ghost btn-sm" onClick={() => setView('home')}><ArrowLeft size={18} /> Programma</button><WorkoutHistory logs={logs} onClear={() => { if (window.confirm('Cancellare tutto il registro e i progressi salvati? Non si può annullare.')) { setLogs([]); setCompleted(new Set()); } }} /></main>;
   if (view === 'run') return <RunIntervals onExit={() => setView('home')} />;
 
-  return <main className="max-w-lg mx-auto p-4 pb-10 space-y-5">
+  return <main className="app-shell max-w-lg mx-auto p-4 pb-10 space-y-5">
     <section className="card bg-primary text-primary-content overflow-hidden"><div className="card-body p-5 relative"><div className="absolute right-3 top-3 opacity-20"><Zap size={90} /></div><span className="badge">PROGRAMMA 30 GIORNI</span><h1 className="text-2xl font-bold max-w-xs">Potenza gambe, rapidità e velocità</h1><p className="text-primary-content/75 text-sm">12 sedute guidate · corpo libero · 35–42 minuti</p><div className="mt-2"><div className="flex justify-between text-xs"><span>{doneCount}/12 completati</span><span>{progress}%</span></div><progress className="progress w-full" value={progress} max="100" /></div></div></section>
     <SpotifyHomeCard />
     <button className="card bg-base-200 w-full text-left border border-primary/30" onClick={() => open(nextWorkout)}><div className="card-body p-4"><div className="flex items-center justify-between"><div><span className="badge badge-secondary">PROSSIMO</span><h2 className="font-bold text-lg mt-2">S{nextWorkout.week} · G{nextWorkout.day} — {nextWorkout.title}</h2><p className="text-sm text-base-content/60">{nextWorkout.duration} · {nextWorkout.focus}</p></div><span className="btn btn-primary btn-circle"><Zap /></span></div></div></button>

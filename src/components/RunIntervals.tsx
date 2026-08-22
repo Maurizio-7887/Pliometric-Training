@@ -114,7 +114,7 @@ export const RunIntervals: React.FC<Props> = ({ onExit }) => {
 
   const pace = repElapsed > 0 && repDistance > 0 ? (repElapsed / 60) / (repDistance / 1000) : null;
 
-  if (phase === 'setup') return <div className="space-y-4 max-w-lg mx-auto p-4">
+  if (phase === 'setup') return <div className="app-shell space-y-4 max-w-lg mx-auto p-4">
     <button className="btn btn-ghost btn-sm" onClick={onExit}><ArrowLeft size={18} /> Programma</button>
     <section className="card bg-primary text-primary-content"><div className="card-body p-5"><h2 className="card-title text-2xl">Serie sui 1000 metri</h2><p className="text-primary-content/80">Ripetute a distanza con GPS, recupero a camminare</p></div></section>
     <div className="card bg-base-200"><div className="card-body p-4 gap-3">
@@ -127,13 +127,13 @@ export const RunIntervals: React.FC<Props> = ({ onExit }) => {
     <button className="btn btn-primary btn-lg w-full" onClick={() => { activateSpotifyElement(); if (isSpotifyLoggedIn()) { playSpotifyLink(getSpotifyLink()).then(ok => { if (!ok) openSpotify(); }); } else { openSpotify(); } startRep(1); }}><Play fill="currentColor" /> INIZIA LA SERIE</button>
   </div>;
 
-  if (phase === 'done') return <div className="space-y-4 max-w-lg mx-auto p-4">
+  if (phase === 'done') return <div className="app-shell space-y-4 max-w-lg mx-auto p-4">
     <section className="card bg-success text-success-content"><div className="card-body p-6 text-center"><h2 className="card-title justify-center text-2xl">Serie completata!</h2><p>{reps} ripetute da {targetMeters} m</p></div></section>
     <button className="btn btn-primary btn-lg w-full" onClick={() => setPhase('setup')}><RotateCcw size={18} /> Rifai la serie</button>
     <button className="btn btn-ghost w-full" onClick={onExit}><ArrowLeft size={18} /> Torna al programma</button>
   </div>;
 
-  return <div className="space-y-4 max-w-lg mx-auto p-4">
+  return <div className="app-shell space-y-4 max-w-lg mx-auto p-4">
     <div className="flex justify-between items-center"><button className="btn btn-ghost btn-sm" onClick={stopAll}><ArrowLeft size={18} /> Esci</button><span className="badge badge-outline">Ripetuta {repNo}/{reps}</span>{getSpotifyLink() && <button className="btn btn-ghost btn-sm btn-circle" onClick={openSpotify} aria-label="Apri Spotify"><Music size={18} /></button>}</div>
     {phase === 'running' && <div className="card bg-primary text-primary-content"><div className="card-body items-center text-center p-6 gap-1">
       <span className="text-sm opacity-80">METRI PERCORSI</span>
