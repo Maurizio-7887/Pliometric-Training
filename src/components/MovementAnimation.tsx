@@ -81,7 +81,8 @@ export const MovementAnimation:React.FC<Props> = ({kind,active=true}) => {
   const videoDemo:Partial<Record<MoveKind,{src:string;label:string;aria:string}>>={
     bounds:{src:'./videos/balzi-alternati-bounding.mp4',label:'TECNICA · BALZI ALTERNATI',aria:'Dimostrazione tecnica video: balzi alternati bounding'},
     feet:{src:'./videos/piedi-rapidi-quick-feet.mp4',label:'TECNICA · PIEDI RAPIDI',aria:'Dimostrazione tecnica video: piedi rapidi quick feet'},
-    sprint:{src:'./videos/accelerazione-sprint.mp4',label:'TECNICA · ACCELERAZIONE SPRINT',aria:'Dimostrazione tecnica video: accelerazione sprint'}
+    sprint:{src:'./videos/accelerazione-sprint.mp4',label:'TECNICA · ACCELERAZIONE SPRINT',aria:'Dimostrazione tecnica video: accelerazione sprint'},
+    calf:{src:'./videos/calf-raise-esplosivo-monopodalico.mp4',label:'TECNICA · CALF RAISE MONOPODALICO',aria:'Dimostrazione tecnica video: calf raise esplosivo monopodalico'}
   };
   const demo=videoDemo[kind];
   if(demo)return <div className={`move-stage move-video ${active?'is-moving':''}`} role="img" aria-label={demo.aria}>
