@@ -78,9 +78,15 @@ export const MovementAnimation:React.FC<Props> = ({kind,active=true}) => {
     if(active)video.play().catch(()=>{}); else video.pause();
   },[active,kind]);
   const pose=useMemo(()=>{const list=poses[kind];const progress=(clock%speeds[kind])/speeds[kind]*list.length;const i=Math.floor(progress)%list.length;const t=(1-Math.cos((progress-i)*Math.PI))/2;return blend(list[i],list[(i+1)%list.length],t)},[clock,kind]);
-  if(kind==='bounds')return <div className={`move-stage move-video ${active?'is-moving':''}`} role="img" aria-label="Dimostrazione tecnica video: balzi alternati bounding">
-    <video ref={videoRef} src="./videos/balzi-alternati-bounding.mp4" autoPlay={active} loop muted playsInline preload="metadata" />
-    <span className="move-caption">TECNICA · BALZI ALTERNATI</span>
+  const videoDemo:Partial<Record<MoveKind,{src:string;label:string;aria:string}>>={
+    bounds:{src:'./videos/balzi-alternati-bounding.mp4',label:'TECNICA · BALZI ALTERNATI',aria:'Dimostrazione tecnica video: balzi alternati bounding'},
+    feet:{src:'./videos/piedi-rapidi-quick-feet.mp4',label:'TECNICA · PIEDI RAPIDI',aria:'Dimostrazione tecnica video: piedi rapidi quick feet'},
+    sprint:{src:'./videos/accelerazione-sprint.mp4',label:'TECNICA · ACCELERAZIONE SPRINT',aria:'Dimostrazione tecnica video: accelerazione sprint'}
+  };
+  const demo=videoDemo[kind];
+  if(demo)return <div className={`move-stage move-video ${active?'is-moving':''}`} role="img" aria-label={demo.aria}>
+    <video ref={videoRef} src={demo.src} autoPlay={active} loop muted playsInline preload="metadata" />
+    <span className="move-caption">{demo.label}</span>
   </div>;
   const limb=(a:Point,b:Point,key:string)=><line key={key} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} />;
   const directional=['broad','bounds','sprint'].includes(kind); const markers=['lateral','feet'].includes(kind);
