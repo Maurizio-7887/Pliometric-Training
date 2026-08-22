@@ -12,6 +12,7 @@ import { handleSpotifyRedirect } from './spotifyAuth';
 type View = 'home' | 'plyo' | 'detail' | 'timer' | 'history' | 'run';
 const STORAGE_KEY = 'scatto-forza-30-progress';
 const LOG_KEY = 'scatto-forza-30-session-log';
+const RESET_KEY = 'scatto-forza-30-reset-2026-08-22';
 
 function readProgress(): Set<string> {
   try {
@@ -35,6 +36,12 @@ export default function App() {
   const [logs, setLogs] = useState<SessionLog[]>([]);
 
   useEffect(() => {
+    // Azzeramento unico richiesto il 22/08/2026: conserva Spotify e preferenze musicali.
+    if (!localStorage.getItem(RESET_KEY)) {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(LOG_KEY);
+      localStorage.setItem(RESET_KEY, 'done');
+    }
     setCompleted(readProgress());
     setLogs(readLogs());
     handleSpotifyRedirect().finally(() => setReady(true));
