@@ -74,6 +74,8 @@ const blend=(a:Pose|undefined,b:Pose|undefined,t:number):Pose=>{
 };
 
 const professionalVideos: Record<string, {src:string; label:string; aria:string}> = {
+  warm:{src:'./videos/riscaldamento-dinamico.mp4',label:'TECNICA · RISCALDAMENTO DINAMICO',aria:'Video professionale: riscaldamento dinamico'},
+  cool:{src:'./videos/defaticamento.mp4',label:'TECNICA · DEFATICAMENTO',aria:'Video professionale: defaticamento'},
   pogo:{src:'./videos/esercizi/pogo.mp4',label:'TECNICA · POGO JUMPS',aria:'Video professionale: pogo jumps'},
   squat:{src:'./videos/esercizi/squat.mp4',label:'TECNICA · SQUAT JUMP',aria:'Video professionale: squat jump'},
   broad:{src:'./videos/esercizi/broad.mp4',label:'TECNICA · SALTO IN LUNGO',aria:'Video professionale: salto in lungo da fermo'},

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'; 
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Dumbbell, History, Info, MapPinned, Zap } from 'lucide-react';
 import { workouts } from './data';
 import type { SessionLog, Workout } from './types';
