@@ -18,6 +18,8 @@ const say = (text: string) => {
 };
 
 /** Attende la fine reale del TTS: il countdown non può troncare “Preparati”. */
+const wait = (ms: number) => new Promise<void>(resolve => window.setTimeout(resolve, ms));
+
 const sayAndWait = (text: string): Promise<void> => {
   if (!('speechSynthesis' in window)) return Promise.resolve();
   window.speechSynthesis.cancel();
@@ -114,7 +116,10 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
       // Deve avvenire direttamente nel gesto dell'utente per sbloccare l'audio Spotify su mobile.
       activateSpotifyElement();
       await sayAndWait('Preparati');
-      // Sequenza obbligatoria: fine TTS → comando PLAY Spotify → countdown da 5.
+      // Alcuni telefoni/cuffie Bluetooth emettono ancora la coda audio per pochi istanti
+      // dopo l'evento `end`: questo margine impedisce qualsiasi sovrapposizione.
+      await wait(350);
+      // Sequenza tassativa: voce terminata → silenzio → PLAY Spotify → countdown da 5.
       if (isSpotifyLoggedIn() && getSpotifyLink()) {
         spotifyStarted.current = await playSpotifyLink(getSpotifyLink());
       }

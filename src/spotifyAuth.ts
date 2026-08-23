@@ -63,7 +63,12 @@ async function refreshAccessToken(): Promise<string | null> {
   try {
     const body = new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: CLIENT_ID });
     const res = await fetch('https://accounts.spotify.com/api/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
-    if (!res.ok) { spotifyLogout(); return null; }
+    // Non cancellare la sessione per errori temporanei di rete, server o limite richieste:
+    // altrimenti Spotify torna inutilmente a chiedere le credenziali.
+    if (!res.ok) {
+      if (res.status === 400 || res.status === 401) spotifyLogout();
+      return null;
+    }
     const data = await res.json();
     saveTokens(data, refreshToken);
     return data.access_token as string;
