@@ -1,4 +1,4 @@
-const CACHE = 'scatto-forza-30-v18-run-pace-log-reset';
+const CACHE = 'scatto-forza-30-v19-fixed-runs-wake-lock';
 const APP_SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
