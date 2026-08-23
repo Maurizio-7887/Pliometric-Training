@@ -16,6 +16,23 @@ const say = (text: string) => {
   utterance.lang = 'it-IT'; utterance.rate = .98; utterance.volume = 1;
   window.speechSynthesis.speak(utterance);
 };
+
+/** Attende la fine reale del TTS: il countdown non può troncare “Preparati”. */
+const sayAndWait = (text: string): Promise<void> => {
+  if (!('speechSynthesis' in window)) return Promise.resolve();
+  window.speechSynthesis.cancel();
+  return new Promise(resolve => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'it-IT'; utterance.rate = .98; utterance.volume = 1;
+    let finished = false;
+    const finish = () => { if (!finished) { finished = true; resolve(); } };
+    utterance.onend = finish;
+    utterance.onerror = finish;
+    window.speechSynthesis.speak(utterance);
+    // Salvagente per browser che, raramente, non emettono l'evento end.
+    window.setTimeout(finish, 6000);
+  });
+};
 const beep = () => {
   try {
     const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -31,6 +48,7 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
   const [phase, setPhase] = useState<Phase>('ready');
   const [left, setLeft] = useState(5);
   const [running, setRunning] = useState(false);
+  const [starting, setStarting] = useState(false);
   const startedAt = useRef<string | null>(null);
   const deadline = useRef(0);
   const spokenSecond = useRef(-1);
@@ -54,7 +72,7 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
 
   useEffect(() => {
     if (!running || phase === 'done') return;
-    if (phase === 'ready') say(`Preparati. ${exercise.name}. Serie ${setNo} di ${exercise.sets}`);
+    // In fase ready il parlato iniziale è gestito e atteso da start(), senza timer sovrapposti.
     if (phase === 'work') { beep(); say(`Via. ${exercise.name}. ${exercise.prescription}`); }
     if (phase === 'rest') say(`Stop. Recupero ${exercise.rest} secondi`);
   }, [running, phase, idx, setNo, exercise]);
@@ -67,7 +85,8 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
       setLeft(current => current === remaining ? current : remaining);
       if (remaining !== spokenSecond.current) {
         spokenSecond.current = remaining;
-        if (remaining > 0 && remaining <= 3) { beep(); say(String(remaining)); }
+        if (phase === 'ready' && remaining > 0 && remaining <= 5) { beep(); say(String(remaining)); }
+        else if ((phase === 'work' || phase === 'rest') && remaining > 0 && remaining <= 3) { beep(); say(String(remaining)); }
         else if ((phase === 'work' || phase === 'rest') && remaining === 10) say('10 secondi');
       }
       if (remaining === 0) next();
@@ -85,16 +104,31 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
     if (phase === 'done') say('Allenamento completato. Ottimo lavoro.');
   }, [phase, running]);
 
-  const start = () => {
+  const start = async () => {
+    if (starting) return;
     const firstStart = !startedAt.current;
     if (firstStart) {
+      setStarting(true);
       startedAt.current = new Date().toISOString();
       onStart(startedAt.current);
+      // Deve avvenire direttamente nel gesto dell'utente per sbloccare l'audio Spotify su mobile.
       activateSpotifyElement();
-    } else if (spotifyStarted.current && isSpotifyLoggedIn()) resumeSpotifyPlayback();
-    deadline.current = performance.now() + left * 1000;
-    spokenSecond.current = -1;
-    setRunning(true);
+      await sayAndWait('Preparati');
+      // Sequenza obbligatoria: fine TTS → comando PLAY Spotify → countdown da 5.
+      if (isSpotifyLoggedIn() && getSpotifyLink()) {
+        spotifyStarted.current = await playSpotifyLink(getSpotifyLink());
+      }
+      setLeft(5);
+      deadline.current = performance.now() + 5000;
+      spokenSecond.current = -1;
+      setRunning(true);
+      setStarting(false);
+    } else {
+      if (spotifyStarted.current && isSpotifyLoggedIn()) await resumeSpotifyPlayback();
+      deadline.current = performance.now() + left * 1000;
+      spokenSecond.current = -1;
+      setRunning(true);
+    }
     try { (navigator as Navigator & { wakeLock?: { request: (type: 'screen') => Promise<unknown> } }).wakeLock?.request('screen').catch(() => undefined); } catch { /* facoltativo */ }
   };
   const pause = () => { setRunning(false); deadline.current = 0; if (isSpotifyLoggedIn()) pauseSpotifyPlayback(); };
@@ -107,7 +141,7 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
   return <div className="guided-timer min-h-screen flex flex-col gap-4 pb-5">
     <div className="flex justify-between items-center"><button className="btn btn-ghost btn-sm" onClick={onExit}><ArrowLeft size={18} /> Esci</button><span className="badge badge-outline">{idx + 1}/{workout.exercises.length}</span>{getSpotifyLink() && <button className="btn btn-ghost btn-sm btn-circle" onClick={openSpotify} aria-label="Apri Spotify"><Music size={18} /></button>}</div>
     <div className={`guided-main-card card ${phase === 'work' ? 'bg-primary text-primary-content' : phase === 'rest' ? 'bg-secondary text-secondary-content' : 'bg-base-200'}`}><div className="guided-main-body card-body p-5 items-center text-center"><div><span className="badge badge-lg">{phase === 'ready' ? 'CONTO ALLA ROVESCIA' : phase === 'work' ? 'LAVORO' : 'RECUPERO'}</span><h2 className="text-2xl font-bold mt-3">{exercise.name}</h2><p className="opacity-80">Serie {setNo} di {exercise.sets} · {exercise.prescription}</p></div><MovementAnimation kind={exercise.kind} active={running} id={exercise.id} /><div><div className="font-mono text-7xl font-black tabular-nums">{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</div><progress className="progress w-full mt-3" value={pct} max="100" /><p className="mt-3 font-medium">{exercise.cues.join(' · ')}</p></div></div></div>
-    <div className="guided-controls grid grid-cols-4 gap-2"><button className="btn btn-ghost" onClick={reset}><RotateCcw /></button><button className="guided-start btn btn-primary col-span-2 btn-lg" onClick={() => running ? pause() : start()}>{running ? <><Pause /> PAUSA</> : <><Play /> {startedAt.current ? 'RIPRENDI' : 'START'}</>}</button><button className="btn btn-ghost" onClick={next}><SkipForward /></button></div>
+    <div className="guided-controls grid grid-cols-4 gap-2"><button className="btn btn-ghost" onClick={reset}><RotateCcw /></button><button className="guided-start btn btn-primary col-span-2 btn-lg" disabled={starting} onClick={() => running ? pause() : void start()}>{starting ? <><Volume2 /> PREPARATI…</> : running ? <><Pause /> PAUSA</> : <><Play /> {startedAt.current ? 'RIPRENDI' : 'START'}</>}</button><button className="btn btn-ghost" onClick={next}><SkipForward /></button></div>
     <p className="text-xs text-center text-base-content/60 flex items-center justify-center gap-1"><Volume2 size={14} /> Conto alla rovescia e annunci anche nelle cuffiette Bluetooth.</p>
   </div>;
 };

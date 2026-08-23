@@ -81,12 +81,24 @@ export async function playSpotifyLink(link: string): Promise<boolean> {
   const token = await getValidSpotifyToken();
   const device = await ensurePlayerReady();
   if (!token || !device) return false;
+  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const playBody = uri.startsWith('spotify:track:') ? { uris: [uri] } : { context_uri: uri };
   try {
-    const res = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${device}`, {
-      method: 'PUT',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ context_uri: uri }),
+    // Rende esplicitamente attivo il lettore dell'app prima del PLAY: evita che
+    // Spotify mantenga come destinazione un telefono/PC usato in precedenza.
+    await fetch('https://api.spotify.com/v1/me/player', {
+      method: 'PUT', headers,
+      body: JSON.stringify({ device_ids: [device], play: false }),
     });
+    const play = () => fetch(`https://api.spotify.com/v1/me/player/play?device_id=${device}`, {
+      method: 'PUT', headers, body: JSON.stringify(playBody),
+    });
+    let res = await play();
+    // Il trasferimento del dispositivo può richiedere qualche istante su mobile.
+    if (!res.ok && res.status !== 204) {
+      await new Promise(resolve => window.setTimeout(resolve, 350));
+      res = await play();
+    }
     return res.ok || res.status === 204;
   } catch { return false; }
 }
