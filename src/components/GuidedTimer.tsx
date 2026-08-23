@@ -5,6 +5,7 @@ import { MovementAnimation } from './MovementAnimation';
 import { getSpotifyLink, openSpotify } from '../spotify';
 import { isSpotifyLoggedIn } from '../spotifyAuth';
 import { activateSpotifyElement, pauseSpotifyPlayback, playSpotifyLink, prepareSpotifyPlayer, resumeSpotifyPlayback } from '../spotifyPlayer';
+import { useScreenWakeLock } from '../useScreenWakeLock';
 
 type Phase = 'ready' | 'work' | 'rest' | 'done';
 interface Props { workout: Workout; onExit: () => void; onStart: (startedAt: string) => void; onComplete: (startedAt: string, endedAt: string) => void; }
@@ -53,6 +54,7 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
   const deadline = useRef(0);
   const spokenSecond = useRef(-1);
   const spotifyStarted = useRef(false);
+  const { acquire: keepScreenOn, release: allowScreenLock, held: screenKeptOn, supported: wakeLockSupported } = useScreenWakeLock();
   const exercise = workout.exercises[idx];
 
   useEffect(() => {
@@ -65,10 +67,10 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
     if (phase === 'work' && exercise.rest > 0) { setPhase('rest'); setLeft(exercise.rest); return; }
     if ((phase === 'work' || phase === 'rest') && setNo < exercise.sets) { setSetNo(n => n + 1); setPhase('ready'); setLeft(5); return; }
     if (idx < workout.exercises.length - 1) { setIdx(n => n + 1); setSetNo(1); setPhase('ready'); setLeft(5); return; }
-    setPhase('done'); setRunning(false);
+    setPhase('done'); setRunning(false); void allowScreenLock();
     const endedAt = new Date().toISOString();
     onComplete(startedAt.current ?? endedAt, endedAt);
-  }, [phase, exercise, setNo, idx, workout.exercises.length, onComplete]);
+  }, [phase, exercise, setNo, idx, workout.exercises.length, onComplete, allowScreenLock]);
 
   useEffect(() => {
     if (!running || phase === 'done') return;
@@ -111,7 +113,8 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
       setStarting(true);
       startedAt.current = new Date().toISOString();
       onStart(startedAt.current);
-      // Deve avvenire direttamente nel gesto dell'utente per sbloccare l'audio Spotify su mobile.
+      // Entrambe le richieste partono dal gesto dell'utente: audio mobile e schermo sempre acceso.
+      void keepScreenOn();
       activateSpotifyElement();
       await sayAndWait('Preparati');
       // Spotify NON parte qui: il countdown 5-4-3-2-1 deve restare senza musica.
@@ -127,19 +130,20 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
       spokenSecond.current = -1;
       setRunning(true);
     }
-    try { (navigator as Navigator & { wakeLock?: { request: (type: 'screen') => Promise<unknown> } }).wakeLock?.request('screen').catch(() => undefined); } catch { /* facoltativo */ }
+    void keepScreenOn();
   };
   const pause = () => { setRunning(false); deadline.current = 0; if (isSpotifyLoggedIn()) pauseSpotifyPlayback(); };
-  const reset = () => { setRunning(false); setIdx(0); setSetNo(1); setPhase('ready'); setLeft(5); deadline.current = 0; spokenSecond.current = -1; spotifyStarted.current = false; if (isSpotifyLoggedIn()) void pauseSpotifyPlayback(); window.speechSynthesis?.cancel(); };
+  const reset = () => { setRunning(false); setIdx(0); setSetNo(1); setPhase('ready'); setLeft(5); deadline.current = 0; spokenSecond.current = -1; spotifyStarted.current = false; void allowScreenLock(); if (isSpotifyLoggedIn()) void pauseSpotifyPlayback(); window.speechSynthesis?.cancel(); };
+  const exitTimer = () => { void allowScreenLock(); window.speechSynthesis?.cancel(); onExit(); };
 
-  if (phase === 'done') return <div className="min-h-[80vh] flex items-center justify-center"><div className="card bg-base-200 text-center"><div className="card-body items-center"><CheckCircle2 size={72} className="text-success" /><h2 className="card-title text-2xl">Allenamento completato!</h2><p>Hai concluso {workout.title}. Recupera almeno 48 ore prima della prossima seduta pliometrica.</p><button className="btn btn-primary mt-3" onClick={onExit}>Torna al programma</button></div></div></div>;
+  if (phase === 'done') return <div className="min-h-[80vh] flex items-center justify-center"><div className="card bg-base-200 text-center"><div className="card-body items-center"><CheckCircle2 size={72} className="text-success" /><h2 className="card-title text-2xl">Allenamento completato!</h2><p>Hai concluso {workout.title}. Recupera almeno 48 ore prima della prossima seduta pliometrica.</p><button className="btn btn-primary mt-3" onClick={exitTimer}>Torna al programma</button></div></div></div>;
 
   const duration = phase === 'work' ? exercise.work : phase === 'rest' ? exercise.rest : 5;
   const pct = Math.max(0, Math.round(left / duration * 100));
   return <div className="guided-timer min-h-screen flex flex-col gap-4 pb-5">
-    <div className="flex justify-between items-center"><button className="btn btn-ghost btn-sm" onClick={onExit}><ArrowLeft size={18} /> Esci</button><span className="badge badge-outline">{idx + 1}/{workout.exercises.length}</span>{getSpotifyLink() && <button className="btn btn-ghost btn-sm btn-circle" onClick={openSpotify} aria-label="Apri Spotify"><Music size={18} /></button>}</div>
+    <div className="flex justify-between items-center"><button className="btn btn-ghost btn-sm" onClick={exitTimer}><ArrowLeft size={18} /> Esci</button><span className="badge badge-outline">{idx + 1}/{workout.exercises.length}</span>{getSpotifyLink() && <button className="btn btn-ghost btn-sm btn-circle" onClick={openSpotify} aria-label="Apri Spotify"><Music size={18} /></button>}</div>
     <div className={`guided-main-card card ${phase === 'work' ? 'bg-primary text-primary-content' : phase === 'rest' ? 'bg-secondary text-secondary-content' : 'bg-base-200'}`}><div className="guided-main-body card-body p-5 items-center text-center"><div><span className="badge badge-lg">{phase === 'ready' ? 'CONTO ALLA ROVESCIA' : phase === 'work' ? 'LAVORO' : 'RECUPERO'}</span><h2 className="text-2xl font-bold mt-3">{exercise.name}</h2><p className="opacity-80">Serie {setNo} di {exercise.sets} · {exercise.prescription}</p></div><MovementAnimation kind={exercise.kind} active={running} id={exercise.id} /><div><div className="font-mono text-7xl font-black tabular-nums">{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</div><progress className="progress w-full mt-3" value={pct} max="100" /><p className="mt-3 font-medium">{exercise.cues.join(' · ')}</p></div></div></div>
     <div className="guided-controls grid grid-cols-4 gap-2"><button className="btn btn-ghost" onClick={reset}><RotateCcw /></button><button className="guided-start btn btn-primary col-span-2 btn-lg" disabled={starting} onClick={() => running ? pause() : void start()}>{starting ? <><Volume2 /> PREPARATI…</> : running ? <><Pause /> PAUSA</> : <><Play /> {startedAt.current ? 'RIPRENDI' : 'START'}</>}</button><button className="btn btn-ghost" onClick={next}><SkipForward /></button></div>
-    <p className="text-xs text-center text-base-content/60 flex items-center justify-center gap-1"><Volume2 size={14} /> Conto alla rovescia e annunci anche nelle cuffiette Bluetooth.</p>
+    <p className="text-xs text-center text-base-content/60 flex items-center justify-center gap-1"><Volume2 size={14} /> Annunci in cuffia · Schermo {screenKeptOn ? 'mantenuto acceso' : wakeLockSupported ? 'attivo allo START' : 'da mantenere acceso nelle impostazioni'}</p>
   </div>;
 };
