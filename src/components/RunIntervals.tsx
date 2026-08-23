@@ -114,7 +114,7 @@ export const RunIntervals: React.FC<Props> = ({ onExit }) => {
   };
 
   const skipRest = () => { if (restIntervalRef.current) { clearInterval(restIntervalRef.current); restIntervalRef.current = null; } const next = repNo + 1; if (next > reps) finishAll(); else startRep(next); };
-  const stopAll = () => { stopGeo(); stopTimers(); window.speechSynthesis?.cancel(); phaseRef.current = 'setup'; setPhase('setup'); };
+  const stopAll = () => { stopGeo(); stopTimers(); window.speechSynthesis?.cancel(); phaseRef.current = 'setup'; setGpsError(''); setAccuracy(null); setPhase('setup'); };
 
   const pace = repElapsed > 0 && repDistance > 0 ? (repElapsed / 60) / (repDistance / 1000) : null;
 
@@ -137,7 +137,7 @@ export const RunIntervals: React.FC<Props> = ({ onExit }) => {
 
   if (phase === 'done') return <div className="app-shell run-shell run-done">
     <section className="card bg-success text-success-content"><div className="card-body p-6 text-center"><h2 className="card-title justify-center text-2xl">Serie completata!</h2><p>{reps} ripetute da {targetMeters} m</p></div></section>
-    <button className="btn btn-primary btn-lg w-full" onClick={() => setPhase('setup')}><RotateCcw size={18} /> Rifai la serie</button>
+    <button className="btn btn-primary btn-lg w-full" onClick={() => { phaseRef.current = 'setup'; setGpsError(''); setAccuracy(null); setPhase('setup'); }}><RotateCcw size={18} /> Rifai la serie</button>
     <button className="btn btn-ghost w-full" onClick={onExit}><ArrowLeft size={18} /> Torna al programma</button>
   </div>;
 
