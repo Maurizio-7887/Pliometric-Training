@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Dumbbell, History, Info, MapPinned, Zap } from 'lucide-react';
 import { workouts } from './data';
-import type { SessionLog, Workout } from './types';
+import type { RunSessionSummary, SessionLog, Workout } from './types';
 import { WorkoutDetail } from './components/WorkoutDetail';
 import { GuidedTimer } from './components/GuidedTimer';
 import { WorkoutHistory } from './components/WorkoutHistory';
@@ -12,7 +12,7 @@ import { handleSpotifyRedirect } from './spotifyAuth';
 type View = 'home' | 'plyo' | 'detail' | 'timer' | 'history' | 'run';
 const STORAGE_KEY = 'scatto-forza-30-progress';
 const LOG_KEY = 'scatto-forza-30-session-log';
-const RESET_KEY = 'scatto-forza-30-reset-2026-08-22';
+const RESET_KEY = 'scatto-forza-30-reset-2026-08-23-final';
 
 function readProgress(): Set<string> {
   try {
@@ -36,7 +36,7 @@ export default function App() {
   const [logs, setLogs] = useState<SessionLog[]>([]);
 
   useEffect(() => {
-    // Azzeramento unico richiesto il 22/08/2026: conserva Spotify e preferenze musicali.
+    // Azzeramento unico dei test richiesto il 23/08/2026: conserva Spotify e preferenze musicali.
     if (!localStorage.getItem(RESET_KEY)) {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(LOG_KEY);
@@ -87,12 +87,31 @@ export default function App() {
       ? { ...item, endedAt, durationSeconds, status: 'completato' }
       : item));
   }, [selected]);
+  const completeRunSession = useCallback((summary: RunSessionSummary) => {
+    const totalDistanceMeters = summary.repetitions.reduce((sum, rep) => sum + rep.distanceMeters, 0);
+    const totalRunSeconds = summary.repetitions.reduce((sum, rep) => sum + rep.durationSeconds, 0);
+    const averagePaceSecondsPerKm = totalDistanceMeters > 0
+      ? totalRunSeconds / (totalDistanceMeters / 1000)
+      : undefined;
+    setLogs(previous => [{
+      id: `run-${summary.startedAt}`,
+      workoutId: 'ripetute-1000m',
+      workoutTitle: `RIPETUTE · ${summary.repetitions.length} × ${summary.targetMeters} m`,
+      startedAt: summary.startedAt,
+      endedAt: summary.endedAt,
+      durationSeconds: Math.max(0, Math.round((Date.parse(summary.endedAt) - Date.parse(summary.startedAt)) / 1000)),
+      status: 'completato',
+      runRepetitions: summary.repetitions,
+      totalDistanceMeters,
+      averagePaceSecondsPerKm,
+    }, ...previous]);
+  }, []);
 
   if (!ready) return <div className="h-screen flex items-center justify-center"><span className="loading loading-spinner loading-lg text-primary" /></div>;
   if (view === 'timer' && selected) return <main className="app-shell w-full p-3"><GuidedTimer workout={selected} onExit={() => setView('detail')} onStart={startSession} onComplete={completeSession} /></main>;
   if (view === 'detail' && selected) return <main className="app-shell w-full p-3"><WorkoutDetail workout={selected} onBack={() => setView('plyo')} onStart={() => setView('timer')} /></main>;
   if (view === 'history') return <main className="app-shell w-full p-3 space-y-4"><button className="btn btn-ghost btn-sm" onClick={() => setView('home')}><ArrowLeft size={18} /> Home</button><WorkoutHistory logs={logs} onClear={() => { if (window.confirm('Cancellare tutto il registro e i progressi salvati? Non si può annullare.')) { setLogs([]); setCompleted(new Set()); } }} /></main>;
-  if (view === 'run') return <RunIntervals onExit={() => setView('home')} />;
+  if (view === 'run') return <RunIntervals onExit={() => setView('home')} onComplete={completeRunSession} />;
 
   if (view === 'plyo') return <main className="app-shell plyo-shell w-full p-3 pb-10">
     <button className="btn btn-ghost btn-sm" onClick={() => setView('home')}><ArrowLeft size={18} /> Home</button>

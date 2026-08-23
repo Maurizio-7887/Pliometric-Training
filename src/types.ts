@@ -14,6 +14,21 @@ export interface Exercise {
   vest?: string;
 }
 
+export interface RunRepResult {
+  repetition: number;
+  distanceMeters: number;
+  durationSeconds: number;
+  paceSecondsPerKm: number;
+}
+
+export interface RunSessionSummary {
+  startedAt: string;
+  endedAt: string;
+  targetMeters: number;
+  recoverySeconds: number;
+  repetitions: RunRepResult[];
+}
+
 export interface SessionLog {
   id: string;
   workoutId: string;
@@ -22,6 +37,9 @@ export interface SessionLog {
   endedAt: string | null;
   durationSeconds: number | null;
   status: 'in_corso' | 'completato';
+  runRepetitions?: RunRepResult[];
+  totalDistanceMeters?: number;
+  averagePaceSecondsPerKm?: number;
 }
 
 export interface Workout {
