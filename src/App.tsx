@@ -95,7 +95,7 @@ export default function App() {
       : undefined;
     setLogs(previous => [{
       id: `run-${summary.startedAt}`,
-      workoutId: 'ripetute-1000m',
+      workoutId: `ripetute-${summary.targetMeters}m`,
       workoutTitle: `RIPETUTE · ${summary.repetitions.length} × ${summary.targetMeters} m`,
       startedAt: summary.startedAt,
       endedAt: summary.endedAt,
@@ -131,13 +131,13 @@ export default function App() {
   return <main className="app-shell home-shell w-full p-3 pb-10">
     <header className="home-header"><span className="badge badge-primary">SCATTO FORZA 30</span><h1>Scegli l’allenamento</h1><p>Due modalità, nessuna confusione.</p></header>
     <div className="home-choice-grid">
-      <button className="home-choice home-choice-run" onClick={() => setView('run')}><MapPinned /><span><strong>RIPETUTE</strong><small>Serie sui 1000 metri · GPS live</small></span></button>
+      <button className="home-choice home-choice-run" onClick={() => setView('run')}><MapPinned /><span><strong>RIPETUTE</strong><small>400 · 800 · 1.000 metri · GPS live</small></span></button>
       <button className="home-choice home-choice-plyo" onClick={() => setView('plyo')}><Dumbbell /><span><strong>PLIOMETRIA</strong><small>{allComplete ? 'Programma completato' : `Prossima: S${nextWorkout.week} · G${nextWorkout.day} — ${nextWorkout.title}`}</small></span></button>
     </div>
     <div className="home-secondary-actions">
       <button className="btn w-full" onClick={() => setView('history')}><History size={19} /> Registro allenamenti <span className="badge badge-outline">{logs.length}</span></button>
       <button className="btn btn-ghost btn-sm w-full" onClick={() => setInfo(value => !value)}><Info size={16} /> Come usare l’app</button>
-      {info && <div className="card bg-base-200"><div className="card-body p-4 text-sm space-y-2"><p><strong>Ripetute:</strong> apre direttamente le serie sui 1000 metri.</p><p><strong>Pliometria:</strong> mostra soltanto la prossima seduta prevista; le successive restano bloccate.</p><p>Collega le cuffiette e mantieni almeno 48 ore tra due sedute pliometriche.</p></div></div>}
+      {info && <div className="card bg-base-200"><div className="card-body p-4 text-sm space-y-2"><p><strong>Ripetute:</strong> scegli 8×400, 6×800 o 5×1.000 metri con recuperi fissi.</p><p><strong>Pliometria:</strong> mostra soltanto la prossima seduta prevista; le successive restano bloccate.</p><p>Collega le cuffiette e mantieni almeno 48 ore tra due sedute pliometriche.</p></div></div>}
     </div>
   </main>;
 }
