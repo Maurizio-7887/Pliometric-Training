@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Scatto Forza 30 · Analisi</title>
+  <link rel="stylesheet" href="/dashboard/assets/dashboard.css" />
+</head>
+<body>
+  <main class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="/dashboard" aria-label="Scatto Forza 30 dashboard"><span class="brand-mark">S30</span><span><strong>SCATTO FORZA 30</strong><small>ANALISI ALLENAMENTI</small></span></a>
+      <div class="topbar-actions">
+        <span id="connection-state" class="connection-state">Accesso richiesto</span>
+        <button id="refresh-button" class="button button-secondary is-hidden" type="button">Aggiorna dati</button>
+        <button id="forget-button" class="button button-quiet is-hidden" type="button">Esci</button>
+      </div>
+    </header>
+
+    <section id="login-view" class="login-layout" aria-labelledby="login-title">
+      <div class="login-copy">
+        <p class="eyebrow">AREA PERSONALE</p>
+        <h1 id="login-title">Leggi il lavoro.<br /><em>Guida la prossima seduta.</em></h1>
+        <p>Un riepilogo desktop dei soli allenamenti registrati dalla PWA: volumi, passo sulle ripetute, andamento e indicazioni di recupero.</p>
+        <ul class="feature-list"><li>Registro centralizzato su Railway</li><li>Statistiche per 400 · 800 · 1.000 metri</li><li>Nessun controllo per avviare allenamenti</li></ul>
+      </div>
+      <form id="login-form" class="login-card">
+        <p class="eyebrow">COLLEGA IL DASHBOARD</p>
+        <h2>Inserisci la chiave personale</h2>
+        <p class="muted">Usa la stessa <code>SYNC_KEY</code> configurata su Railway. Viene conservata solo in questo browser.</p>
+        <label for="sync-key">Chiave personale</label>
+        <div class="password-field"><input id="sync-key" name="sync-key" type="password" autocomplete="current-password" minlength="24" required placeholder="SYNC_KEY" /><button id="key-visibility" type="button" aria-label="Mostra chiave">Mostra</button></div>
+        <p id="login-error" class="form-error" role="alert" aria-live="polite"></p>
+        <button id="login-button" class="button button-primary button-large" type="submit">Apri analisi</button>
+        <p class="privacy-note">La chiave non viene inclusa nei link e può essere rimossa con “Esci”.</p>
+      </form>
+    </section>
+
+    <section id="dashboard-view" class="dashboard is-hidden" aria-live="polite">
+      <div class="dashboard-intro">
+        <div><p class="eyebrow">CENTRALE ALLENAMENTI</p><h1>Buon lavoro, <span id="period-label">atleta</span>.</h1><p id="data-summary" class="muted">Caricamento delle sedute…</p></div>
+        <div class="updated-box"><span>ULTIMO AGGIORNAMENTO</span><strong id="updated-at">—</strong></div>
+      </div>
+
+      <section class="metric-grid" aria-label="Riepilogo allenamenti">
+        <article class="metric-card"><span>Sedute completate</span><strong id="metric-sessions">—</strong><small id="metric-sessions-note">nel registro</small></article>
+        <article class="metric-card accent-blue"><span>Ripetute GPS</span><strong id="metric-runs">—</strong><small id="metric-runs-note">—</small></article>
+        <article class="metric-card accent-green"><span>Chilometri veloci</span><strong id="metric-distance">—</strong><small>solo distanza delle ripetute</small></article>
+        <article class="metric-card accent-gold"><span>Pliometria</span><strong id="metric-plyo">—</strong><small id="metric-plyo-note">sedute completate</small></article>
+      </section>
+
+      <section class="dashboard-grid overview-grid">
+        <article class="panel pace-panel"><div class="panel-heading"><div><p class="eyebrow">PASSO NEL TEMPO</p><h2>Ripetute registrate</h2></div><span class="chart-key"><i></i> passo medio</span></div><div id="pace-chart" class="chart-wrap" role="img" aria-label="Grafico dell'andamento del passo delle ripetute"></div><p id="pace-chart-empty" class="empty-chart">Completa una ripetuta GPS per visualizzare l’andamento.</p></article>
+        <article class="panel volume-panel"><div class="panel-heading"><div><p class="eyebrow">CARICO RECENTE</p><h2>Distanza per settimana</h2></div><span id="volume-total" class="panel-stat">—</span></div><div id="volume-chart" class="volume-chart" role="img" aria-label="Grafico della distanza delle ripetute per settimana"></div><p id="volume-chart-empty" class="empty-chart">Nessuna distanza GPS disponibile.</p></article>
+      </section>
+
+      <section class="section-heading"><div><p class="eyebrow">CONFRONTO DISTANZE</p><h2>Come stanno andando le ripetute</h2></div><p class="muted">Il confronto usa gli ultimi tre allenamenti rispetto ai tre precedenti per la stessa distanza.</p></section>
+      <section id="pace-cards" class="pace-card-grid" aria-label="Analisi del passo per distanza"></section>
+
+      <section class="dashboard-grid lower-grid">
+        <article class="panel advice-panel"><div class="panel-heading"><div><p class="eyebrow">LETTURA DEL MOMENTO</p><h2>Indicazioni</h2></div><span class="panel-icon">↗</span></div><div id="advice-list" class="advice-list"></div></article>
+        <article class="panel activity-panel"><div class="panel-heading"><div><p class="eyebrow">REGISTRO RECENTE</p><h2>Ultime sedute</h2></div><span id="recent-count" class="panel-stat">—</span></div><div id="recent-list" class="recent-list"></div></article>
+      </section>
+    </section>
+
+    <section id="dashboard-error" class="dashboard-error is-hidden" role="alert"><strong>Impossibile caricare i dati.</strong><p id="dashboard-error-text">Controlla la connessione e la chiave personale.</p><button id="retry-button" class="button button-primary" type="button">Riprova</button></section>
+  </main>
+  <script src="/dashboard/assets/dashboard.js" defer></script>
+</body>
+</html>

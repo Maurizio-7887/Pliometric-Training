@@ -1,18 +1,19 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Dumbbell, History, Info, MapPinned, Zap } from 'lucide-react';
 import { workouts } from './data';
 import type { RunSessionSummary, SessionLog, Workout } from './types';
 import { WorkoutDetail } from './components/WorkoutDetail';
 import { GuidedTimer } from './components/GuidedTimer';
 import { WorkoutHistory } from './components/WorkoutHistory';
+import { MobileSyncSettings } from './components/MobileSyncSettings';
 import { RunIntervals } from './components/RunIntervals';
 import { MovementAnimation } from './components/MovementAnimation';
 import { handleSpotifyRedirect } from './spotifyAuth';
+import { isSyncConfigured, mergeLogs, readSyncConfig, saveSyncConfig, synchronizeTraining, type SyncConfig } from './trainingSync';
 
 type View = 'home' | 'plyo' | 'detail' | 'timer' | 'history' | 'run';
 const STORAGE_KEY = 'scatto-forza-30-progress';
 const LOG_KEY = 'scatto-forza-30-session-log';
-const RESET_KEY = 'scatto-forza-30-reset-2026-08-23-final';
 
 function readProgress(): Set<string> {
   try {
@@ -34,14 +35,19 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [info, setInfo] = useState(false);
   const [logs, setLogs] = useState<SessionLog[]>([]);
+  const [syncConfig, setSyncConfig] = useState<SyncConfig>(() => readSyncConfig());
+  const [syncState, setSyncState] = useState<'non_configurata' | 'sincronizzazione' | 'sincronizzata' | 'offline' | 'errore'>('non_configurata');
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState('');
+  const syncRunning = useRef(false);
+  const syncAgain = useRef(false);
+  const logsRef = useRef<SessionLog[]>([]);
+  const completedRef = useRef<Set<string>>(new Set());
+  logsRef.current = logs;
+  completedRef.current = completed;
 
   useEffect(() => {
-    // Azzeramento unico dei test richiesto il 23/08/2026: conserva Spotify e preferenze musicali.
-    if (!localStorage.getItem(RESET_KEY)) {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(LOG_KEY);
-      localStorage.setItem(RESET_KEY, 'done');
-    }
+    // Non azzerare mai lo storico: al primo collegamento verrà migrato su PostgreSQL.
     setCompleted(readProgress());
     setLogs(readLogs());
     handleSpotifyRedirect().finally(() => setReady(true));
@@ -52,6 +58,50 @@ export default function App() {
   useEffect(() => {
     if (ready) localStorage.setItem(LOG_KEY, JSON.stringify(logs));
   }, [logs, ready]);
+
+  const performSync = useCallback(async () => {
+    if (!ready || !isSyncConfigured(syncConfig)) { setSyncState('non_configurata'); return; }
+    if (!navigator.onLine) { setSyncState('offline'); return; }
+    if (syncRunning.current) { syncAgain.current = true; return; }
+    syncRunning.current = true;
+    setSyncState('sincronizzazione');
+    setSyncError('');
+    try {
+      const remote = await synchronizeTraining({ logs: logsRef.current, completedWorkoutIds: [...completedRef.current] }, syncConfig);
+      setLogs(current => {
+        const merged = mergeLogs(current, remote.logs ?? []);
+        return JSON.stringify(merged) === JSON.stringify(current) ? current : merged;
+      });
+      setCompleted(current => {
+        const merged = new Set([...current, ...(remote.completedWorkoutIds ?? [])]);
+        return JSON.stringify([...merged].sort()) === JSON.stringify([...current].sort()) ? current : merged;
+      });
+      setLastSyncAt(new Date().toISOString());
+      setSyncState('sincronizzata');
+    } catch (error) {
+      setSyncError(error instanceof Error ? error.message : 'Sincronizzazione non riuscita');
+      setSyncState(navigator.onLine ? 'errore' : 'offline');
+    } finally {
+      syncRunning.current = false;
+      if (syncAgain.current) { syncAgain.current = false; window.setTimeout(() => void performSync(), 300); }
+    }
+  }, [ready, syncConfig]);
+
+  useEffect(() => {
+    if (!ready || !isSyncConfigured(syncConfig)) return;
+    const timer = window.setTimeout(() => void performSync(), 900);
+    const online = () => void performSync();
+    window.addEventListener('online', online);
+    return () => { window.clearTimeout(timer); window.removeEventListener('online', online); };
+  }, [ready, syncConfig, logs, completed, performSync]);
+
+  const updateSyncConfig = useCallback((config: SyncConfig) => {
+    const clean = { apiUrl: config.apiUrl.trim().replace(/\/+$/, ''), token: config.token.trim() };
+    saveSyncConfig(clean);
+    setSyncConfig(clean);
+    setSyncState(isSyncConfigured(clean) ? 'sincronizzazione' : 'non_configurata');
+    setSyncError('');
+  }, []);
 
   const doneCount = completed.size;
   const progress = Math.round(doneCount / workouts.length * 100);
@@ -110,7 +160,7 @@ export default function App() {
   if (!ready) return <div className="h-screen flex items-center justify-center"><span className="loading loading-spinner loading-lg text-primary" /></div>;
   if (view === 'timer' && selected) return <main className="app-shell w-full p-3"><GuidedTimer workout={selected} onExit={() => setView('detail')} onStart={startSession} onComplete={completeSession} /></main>;
   if (view === 'detail' && selected) return <main className="app-shell w-full p-3"><WorkoutDetail workout={selected} onBack={() => setView('plyo')} onStart={() => setView('timer')} /></main>;
-  if (view === 'history') return <main className="app-shell w-full p-3 space-y-4"><button className="btn btn-ghost btn-sm" onClick={() => setView('home')}><ArrowLeft size={18} /> Home</button><WorkoutHistory logs={logs} onClear={() => { if (window.confirm('Cancellare tutto il registro e i progressi salvati? Non si può annullare.')) { setLogs([]); setCompleted(new Set()); } }} /></main>;
+  if (view === 'history') return <main className="app-shell w-full p-3 space-y-4"><button className="btn btn-ghost btn-sm" onClick={() => setView('home')}><ArrowLeft size={18} /> Home</button><WorkoutHistory logs={logs} onClear={() => { if (window.confirm('Cancellare i dati soltanto da questo dispositivo? Le copie già sincronizzate resteranno nel database.')) { setLogs([]); setCompleted(new Set()); } }} /><MobileSyncSettings config={syncConfig} syncState={syncState} lastSyncAt={lastSyncAt} syncError={syncError} onSaveConfig={updateSyncConfig} onSyncNow={() => void performSync()} /></main>;
   if (view === 'run') return <RunIntervals onExit={() => setView('home')} onComplete={completeRunSession} />;
 
   if (view === 'plyo') return <main className="app-shell plyo-shell w-full p-3 pb-10">

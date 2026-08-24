@@ -1,0 +1,63 @@
+import type { SessionLog } from './types';
+
+export const SYNC_URL_KEY = 'scatto-forza-30-sync-url';
+export const SYNC_TOKEN_KEY = 'scatto-forza-30-sync-token';
+
+export interface SyncConfig {
+  apiUrl: string;
+  token: string;
+}
+
+export interface SyncPayload {
+  logs: SessionLog[];
+  completedWorkoutIds: string[];
+}
+
+export function readSyncConfig(): SyncConfig {
+  return {
+    apiUrl: localStorage.getItem(SYNC_URL_KEY) ?? '',
+    token: localStorage.getItem(SYNC_TOKEN_KEY) ?? '',
+  };
+}
+
+export function saveSyncConfig(config: SyncConfig) {
+  const apiUrl = config.apiUrl.trim().replace(/\/+$/, '');
+  const token = config.token.trim();
+  if (apiUrl) localStorage.setItem(SYNC_URL_KEY, apiUrl); else localStorage.removeItem(SYNC_URL_KEY);
+  if (token) localStorage.setItem(SYNC_TOKEN_KEY, token); else localStorage.removeItem(SYNC_TOKEN_KEY);
+}
+
+export function isSyncConfigured(config: SyncConfig) {
+  return /^https:\/\//i.test(config.apiUrl) && config.token.length >= 24;
+}
+
+export async function synchronizeTraining(payload: SyncPayload, config: SyncConfig): Promise<SyncPayload> {
+  const response = await fetch(`${config.apiUrl.replace(/\/+$/, '')}/api/sync`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${config.token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    throw new Error(detail || `Errore sincronizzazione (${response.status})`);
+  }
+  return response.json() as Promise<SyncPayload>;
+}
+
+export function mergeLogs(local: SessionLog[], remote: SessionLog[]): SessionLog[] {
+  const merged = new Map<string, SessionLog>();
+  [...remote, ...local].forEach(log => {
+    const current = merged.get(log.id);
+    if (!current) { merged.set(log.id, log); return; }
+    const score = (item: SessionLog) => (item.status === 'completato' ? 100 : 0)
+      + (item.endedAt ? 20 : 0)
+      + (item.runRepetitions?.length ?? 0) * 2
+      + (item.totalDistanceMeters ? 1 : 0)
+      + (item.averagePaceSecondsPerKm ? 1 : 0);
+    if (score(log) > score(current)) merged.set(log.id, { ...current, ...log });
+  });
+  return [...merged.values()].sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
+}

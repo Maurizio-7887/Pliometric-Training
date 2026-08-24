@@ -194,3 +194,7 @@ html { scroll-behavior: smooth; width: 100%; min-width: 100%; } body { min-heigh
   .run-accuracy{font-size:1.05rem}
   .run-skip{min-height:5rem;font-size:1.4rem}
 }
+
+/* La PWA usa questa sola scheda compatta per configurare l'invio. L'analisi completa e' sul dashboard Railway. */
+.mobile-sync .badge{max-width:11rem;text-align:center;justify-content:center}.mobile-sync-actions{display:flex;align-items:center;justify-content:space-between;gap:.5rem}.mobile-sync-form{display:grid;gap:.65rem;padding-top:.2rem}.sync-field{display:grid;gap:.3rem;font-size:.78rem;font-weight:700}.sync-field input{width:100%;height:2.8rem;border:1px solid color-mix(in srgb,var(--color-base-content) 18%,transparent);border-radius:.7rem;background:var(--color-base-100);color:var(--color-base-content);padding:0 .8rem;font-size:.86rem;font-weight:400}.alert-error{background:color-mix(in srgb,#b3261e 18%,var(--color-base-100));color:var(--color-base-content)}
+@media (max-width:420px){.mobile-sync-actions{align-items:stretch;flex-direction:column}.mobile-sync-actions .btn{width:100%}}

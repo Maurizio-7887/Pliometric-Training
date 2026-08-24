@@ -54,7 +54,7 @@ Su iPhone la voce guidata dipende dal volume/silenzioso e dalle impostazioni di 
 
 - I completamenti sono memorizzati localmente con la chiave `scatto-forza-30-progress`.
 - Il registro delle sedute è memorizzato con la chiave `scatto-forza-30-session-log`.
-- Non viene usato alcun database o servizio remoto.
+- Per impostazione predefinita i dati restano locali. Facoltativamente, dalla sezione **Registro allenamenti** puoi collegare un servizio Railway personale: le sedute vengono inviate automaticamente anche a PostgreSQL e possono essere lette dal dashboard desktop Railway `/dashboard` con la stessa chiave personale.
 - Il service worker (`public/sw.js`) mette in cache il guscio dell'app e le risorse caricate, così l'app può essere usata offline dopo la prima visita.
 - Per azzerare il programma, cancella i dati del sito dal browser oppure esegui in console: `localStorage.removeItem('scatto-forza-30-progress')`.
 
