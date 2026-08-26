@@ -1,4 +1,4 @@
-const CACHE = 'scatto-forza-30-v21-mobile-sync-desktop-dashboard';
+const CACHE = 'scatto-forza-30-v22-verified-sync-interrupted-sessions';
 const APP_SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));

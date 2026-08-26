@@ -73,11 +73,14 @@
   }
   function normalize(payload) {
     const raw = Array.isArray(payload?.logs) ? payload.logs : [];
-    const completed = raw.filter(log => log && log.status === 'completato' && asDate(log.startedAt))
+    // Interrupted work is a useful part of the plyometric record, while run charts stay
+    // restricted to completed interval sessions so their pace comparison remains meaningful.
+    const terminal = raw.filter(log => log && ['completato', 'interrotto'].includes(log.status) && asDate(log.startedAt))
       .map(log => ({ ...log, date: asDate(log.startedAt), run: sessionTotals(log) }))
       .sort((a, b) => b.date - a.date);
+    const completed = terminal.filter(log => log.status === 'completato');
     const runs = completed.filter(log => log.run.target || Array.isArray(log.runRepetitions) && log.runRepetitions.length);
-    const plyo = completed.filter(log => !runs.includes(log));
+    const plyo = terminal.filter(log => !(log.run.target || Array.isArray(log.runRepetitions) && log.runRepetitions.length));
     return { completed, runs, plyo };
   }
   function monday(date) {
@@ -96,8 +99,10 @@
     $('metric-runs').textContent = integer.format(data.runs.length);
     $('metric-runs-note').textContent = data.runs.length ? `${integer.format(data.runs.reduce((sum, log) => sum + (Array.isArray(log.runRepetitions) ? log.runRepetitions.length : 0), 0))} prove misurate` : 'nessuna ancora';
     $('metric-distance').textContent = `${number.format(totalDistance / 1000)} km`;
-    $('metric-plyo').textContent = integer.format(data.plyo.length);
-    $('metric-plyo-note').textContent = data.plyo.length === 1 ? 'seduta completata' : 'sedute completate';
+    const completedPlyo = data.plyo.filter(log => log.status === 'completato').length;
+    const interruptedPlyo = data.plyo.filter(log => log.status === 'interrotto').length;
+    $('metric-plyo').textContent = integer.format(completedPlyo);
+    $('metric-plyo-note').textContent = interruptedPlyo ? `${integer.format(interruptedPlyo)} interrotta${interruptedPlyo === 1 ? '' : 'e'}` : (completedPlyo === 1 ? 'seduta completata' : 'sedute completate');
     $('data-summary').textContent = data.completed.length
       ? `${data.completed.length} sedute completate disponibili nel registro Railway.`
       : 'Il registro è pronto: completa una seduta dalla PWA per iniziare a leggere i dati.';
@@ -169,6 +174,47 @@
     }).join('');
   }
 
+  function renderPlyo(data) {
+    const sessions = data.plyo;
+    const completed = sessions.filter(item => item.status === 'completato');
+    const interrupted = sessions.filter(item => item.status === 'interrotto');
+    $('plyo-count').textContent = sessions.length ? `${completed.length} ✓ · ${interrupted.length} inter.` : '—';
+    $('plyo-summary').textContent = sessions.length
+      ? `${completed.length} completate, ${interrupted.length} interrotte. Il carico usa la durata effettiva salvata.`
+      : 'Le sedute guidate concluse o terminate prima compariranno qui con il relativo progresso.';
+
+    const container = $('plyo-load-chart');
+    const empty = $('plyo-load-empty');
+    const nowMonday = monday(new Date());
+    const weeks = Array.from({ length: 8 }, (_, index) => { const date = new Date(nowMonday); date.setDate(nowMonday.getDate() - (7 - index) * 7); return { date, seconds: 0 }; });
+    sessions.forEach(log => {
+      const bucket = weeks.find(week => sameDay(week.date, monday(log.date)));
+      if (bucket) bucket.seconds += Math.max(0, Number(log.durationSeconds) || 0);
+    });
+    const hasLoad = weeks.some(week => week.seconds > 0);
+    container.innerHTML = '';
+    empty.classList.toggle('is-visible', !hasLoad);
+    if (hasLoad) {
+      const max = Math.max(...weeks.map(week => week.seconds), 1);
+      container.innerHTML = weeks.map((week, index) => {
+        const percentage = Math.max(3, week.seconds / max * 100);
+        const label = index === 7 ? 'questa' : shortDate.format(week.date);
+        return `<div class="volume-column"><div class="volume-bar plyo-bar" style="height:${percentage}%"><b>${week.seconds ? `${integer.format(Math.round(week.seconds / 60))} min` : ''}</b></div><small>${label}</small></div>`;
+      }).join('');
+      const total = weeks.reduce((sum, week) => sum + week.seconds, 0);
+      $('plyo-load-total').textContent = `${integer.format(Math.round(total / 60))} min / 8 sett.`;
+    } else $('plyo-load-total').textContent = '—';
+
+    const list = $('plyo-session-list');
+    list.innerHTML = sessions.length ? sessions.slice(0, 8).map(log => {
+      const isInterrupted = log.status === 'interrotto';
+      const planned = Number(log.plannedSetCount);
+      const done = Number(log.completedSetCount);
+      const progress = Number.isFinite(planned) && planned > 0 ? `${Number.isFinite(done) ? done : 0}/${planned} serie` : 'Progresso non disponibile';
+      return `<div class="plyo-session-item"><div><div class="plyo-session-title">${escapeHtml(log.workoutTitle || 'Seduta pliometrica')}</div><div class="plyo-session-meta">${dateFormat.format(log.date)} · ${duration(Number(log.durationSeconds))} · ${progress}</div></div><span class="plyo-status ${isInterrupted ? 'is-interrupted' : 'is-complete'}">${isInterrupted ? 'INTERROTTA' : 'COMPLETATA'}</span></div>`;
+    }).join('') : '<div class="empty-state">Il registro pliometria è ancora vuoto.</div>';
+  }
+
   function renderAdvice(data) {
     const suggestions = [];
     const latest = data.completed[0];
@@ -211,6 +257,7 @@
     renderPaceChart(data.runs);
     renderVolumeChart(data.runs);
     renderPaceCards(data.runs);
+    renderPlyo(data);
     renderAdvice(data);
     renderRecent(data.completed);
   }

@@ -1,4 +1,5 @@
 export type MoveKind = 'warmup' | 'pogo' | 'squat' | 'broad' | 'lateral' | 'split' | 'bounds' | 'feet' | 'sprint' | 'calf' | 'cooldown';
+export type SessionStatus = 'in_corso' | 'completato' | 'interrotto';
 
 export interface Exercise {
   id: string;
@@ -27,6 +28,14 @@ export interface RunSessionSummary {
   targetMeters: number;
   recoverySeconds: number;
   repetitions: RunRepResult[];
+  status: Extract<SessionStatus, 'completato' | 'interrotto'>;
+}
+
+export interface PlyoProgress {
+  plannedExerciseCount: number;
+  completedExerciseCount: number;
+  plannedSetCount: number;
+  completedSetCount: number;
 }
 
 export interface SessionLog {
@@ -36,10 +45,14 @@ export interface SessionLog {
   startedAt: string;
   endedAt: string | null;
   durationSeconds: number | null;
-  status: 'in_corso' | 'completato';
+  status: SessionStatus;
   runRepetitions?: RunRepResult[];
   totalDistanceMeters?: number;
   averagePaceSecondsPerKm?: number;
+  plannedExerciseCount?: number;
+  completedExerciseCount?: number;
+  plannedSetCount?: number;
+  completedSetCount?: number;
 }
 
 export interface Workout {

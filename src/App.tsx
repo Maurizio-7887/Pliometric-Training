@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Dumbbell, History, Info, MapPinned, Zap } from 'lucide-react';
 import { workouts } from './data';
-import type { RunSessionSummary, SessionLog, Workout } from './types';
+import type { PlyoProgress, RunSessionSummary, SessionLog, SessionStatus, Workout } from './types';
 import { WorkoutDetail } from './components/WorkoutDetail';
 import { GuidedTimer } from './components/GuidedTimer';
 import { WorkoutHistory } from './components/WorkoutHistory';
@@ -9,7 +9,7 @@ import { MobileSyncSettings } from './components/MobileSyncSettings';
 import { RunIntervals } from './components/RunIntervals';
 import { MovementAnimation } from './components/MovementAnimation';
 import { handleSpotifyRedirect } from './spotifyAuth';
-import { isSyncConfigured, mergeLogs, readSyncConfig, saveSyncConfig, synchronizeTraining, type SyncConfig } from './trainingSync';
+import { isSyncConfigured, mergeLogs, readSyncConfig, saveSyncConfig, synchronizeTraining, verifyRemoteLogs, type SyncConfig, type SyncVerification } from './trainingSync';
 
 type View = 'home' | 'plyo' | 'detail' | 'timer' | 'history' | 'run';
 const STORAGE_KEY = 'scatto-forza-30-progress';
@@ -39,6 +39,7 @@ export default function App() {
   const [syncState, setSyncState] = useState<'non_configurata' | 'sincronizzazione' | 'sincronizzata' | 'offline' | 'errore'>('non_configurata');
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [syncError, setSyncError] = useState('');
+  const [syncVerification, setSyncVerification] = useState<SyncVerification | null>(null);
   const syncRunning = useRef(false);
   const syncAgain = useRef(false);
   const logsRef = useRef<SessionLog[]>([]);
@@ -67,7 +68,11 @@ export default function App() {
     setSyncState('sincronizzazione');
     setSyncError('');
     try {
-      const remote = await synchronizeTraining({ logs: logsRef.current, completedWorkoutIds: [...completedRef.current] }, syncConfig);
+      // Snapshot first: the response must explicitly contain every ID sent by this device.
+      const localLogs = logsRef.current;
+      const remote = await synchronizeTraining({ logs: localLogs, completedWorkoutIds: [...completedRef.current] }, syncConfig);
+      const verification = verifyRemoteLogs(localLogs, remote.logs ?? []);
+      setSyncVerification(verification);
       setLogs(current => {
         const merged = mergeLogs(current, remote.logs ?? []);
         return JSON.stringify(merged) === JSON.stringify(current) ? current : merged;
@@ -128,13 +133,14 @@ export default function App() {
       status: 'in_corso',
     }, ...previous.filter(item => item.id !== id)]);
   }, [selected]);
-  const completeSession = useCallback((startedAt: string, endedAt: string) => {
+  const completeSession = useCallback((startedAt: string, endedAt: string, status: Extract<SessionStatus, 'completato' | 'interrotto'>, progress: PlyoProgress) => {
     if (!selected) return;
     const id = `${selected.id}-${startedAt}`;
     const durationSeconds = Math.max(0, Math.round((Date.parse(endedAt) - Date.parse(startedAt)) / 1000));
-    setCompleted(previous => new Set(previous).add(selected.id));
+    // Only a fully completed workout unlocks the next programmed plyometric session.
+    if (status === 'completato') setCompleted(previous => new Set(previous).add(selected.id));
     setLogs(previous => previous.map(item => item.id === id
-      ? { ...item, endedAt, durationSeconds, status: 'completato' }
+      ? { ...item, endedAt, durationSeconds, status, ...progress }
       : item));
   }, [selected]);
   const completeRunSession = useCallback((summary: RunSessionSummary) => {
@@ -150,7 +156,7 @@ export default function App() {
       startedAt: summary.startedAt,
       endedAt: summary.endedAt,
       durationSeconds: Math.max(0, Math.round((Date.parse(summary.endedAt) - Date.parse(summary.startedAt)) / 1000)),
-      status: 'completato',
+      status: summary.status,
       runRepetitions: summary.repetitions,
       totalDistanceMeters,
       averagePaceSecondsPerKm,
@@ -160,7 +166,7 @@ export default function App() {
   if (!ready) return <div className="h-screen flex items-center justify-center"><span className="loading loading-spinner loading-lg text-primary" /></div>;
   if (view === 'timer' && selected) return <main className="app-shell w-full p-3"><GuidedTimer workout={selected} onExit={() => setView('detail')} onStart={startSession} onComplete={completeSession} /></main>;
   if (view === 'detail' && selected) return <main className="app-shell w-full p-3"><WorkoutDetail workout={selected} onBack={() => setView('plyo')} onStart={() => setView('timer')} /></main>;
-  if (view === 'history') return <main className="app-shell w-full p-3 space-y-4"><button className="btn btn-ghost btn-sm" onClick={() => setView('home')}><ArrowLeft size={18} /> Home</button><WorkoutHistory logs={logs} onClear={() => { if (window.confirm('Cancellare i dati soltanto da questo dispositivo? Le copie già sincronizzate resteranno nel database.')) { setLogs([]); setCompleted(new Set()); } }} /><MobileSyncSettings config={syncConfig} syncState={syncState} lastSyncAt={lastSyncAt} syncError={syncError} onSaveConfig={updateSyncConfig} onSyncNow={() => void performSync()} /></main>;
+  if (view === 'history') return <main className="app-shell w-full p-3 space-y-4"><button className="btn btn-ghost btn-sm" onClick={() => setView('home')}><ArrowLeft size={18} /> Home</button><WorkoutHistory logs={logs} onClear={() => { if (window.confirm('Cancellare i dati soltanto da questo dispositivo? Le copie già sincronizzate resteranno nel database.')) { setLogs([]); setCompleted(new Set()); } }} /><MobileSyncSettings config={syncConfig} syncState={syncState} lastSyncAt={lastSyncAt} syncError={syncError} verification={syncVerification} onSaveConfig={updateSyncConfig} onSyncNow={() => void performSync()} /></main>;
   if (view === 'run') return <RunIntervals onExit={() => setView('home')} onComplete={completeRunSession} />;
 
   if (view === 'plyo') return <main className="app-shell plyo-shell w-full p-3 pb-10">
@@ -186,6 +192,14 @@ export default function App() {
     </div>
     <div className="home-secondary-actions">
       <button className="btn w-full" onClick={() => setView('history')}><History size={19} /> Registro allenamenti <span className="badge badge-outline">{logs.length}</span></button>
+      <p className={`home-sync-status ${syncState === 'sincronizzata' && syncVerification?.verified ? 'is-verified' : ''}`}>
+        {syncState === 'sincronizzata' && syncVerification?.verified
+          ? `Online verificati: ${syncVerification.localCount}/${syncVerification.localCount} locali · ${syncVerification.onlineCount} nel registro`
+          : syncState === 'sincronizzazione' ? 'Verifica salvataggio online in corso…'
+            : syncState === 'offline' ? 'Registro locale: invio appena torna la rete'
+              : syncState === 'errore' ? 'Registro locale: ultimo invio da riprovare'
+                : 'Registro locale · collega il salvataggio online nelle impostazioni'}
+      </p>
       <button className="btn btn-ghost btn-sm w-full" onClick={() => setInfo(value => !value)}><Info size={16} /> Come usare l’app</button>
       {info && <div className="card bg-base-200"><div className="card-body p-4 text-sm space-y-2"><p><strong>Ripetute:</strong> scegli 8×400, 6×800 o 5×1.000 metri con recuperi fissi.</p><p><strong>Pliometria:</strong> mostra soltanto la prossima seduta prevista; le successive restano bloccate.</p><p>Collega le cuffiette e mantieni almeno 48 ore tra due sedute pliometriche.</p></div></div>}
     </div>

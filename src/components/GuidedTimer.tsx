@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Music, Pause, Play, RotateCcw, SkipForward, Volume2 } from 'lucide-react';
-import type { Workout } from '../types';
+import type { PlyoProgress, Workout } from '../types';
 import { MovementAnimation } from './MovementAnimation';
 import { getSpotifyLink, openSpotify } from '../spotify';
 import { isSpotifyLoggedIn } from '../spotifyAuth';
@@ -8,7 +8,7 @@ import { activateSpotifyElement, pauseSpotifyPlayback, playSpotifyLink, prepareS
 import { useScreenWakeLock } from '../useScreenWakeLock';
 
 type Phase = 'ready' | 'work' | 'rest' | 'done';
-interface Props { workout: Workout; onExit: () => void; onStart: (startedAt: string) => void; onComplete: (startedAt: string, endedAt: string) => void; }
+interface Props { workout: Workout; onExit: () => void; onStart: (startedAt: string) => void; onComplete: (startedAt: string, endedAt: string, status: 'completato' | 'interrotto', progress: PlyoProgress) => void; }
 
 const say = (text: string) => {
   if (!('speechSynthesis' in window)) return;
@@ -54,6 +54,8 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
   const deadline = useRef(0);
   const spokenSecond = useRef(-1);
   const spotifyStarted = useRef(false);
+  const finalized = useRef(false);
+  const [finishedStatus, setFinishedStatus] = useState<'completato' | 'interrotto' | null>(null);
   const { acquire: keepScreenOn, release: allowScreenLock, held: screenKeptOn, supported: wakeLockSupported } = useScreenWakeLock();
   const exercise = workout.exercises[idx];
 
@@ -61,16 +63,41 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
     if (isSpotifyLoggedIn() && getSpotifyLink()) void prepareSpotifyPlayer();
   }, []);
 
+  const progressAtStop = useCallback((includeFinishedWork = false): PlyoProgress => {
+    const plannedSetCount = workout.exercises.reduce((sum, item) => sum + item.sets, 0);
+    const completedBefore = workout.exercises.slice(0, idx).reduce((sum, item) => sum + item.sets, 0);
+    const currentCompleted = Math.max(0, Math.min(exercise.sets,
+      phase === 'rest' ? setNo : phase === 'work' ? setNo - 1 + (includeFinishedWork ? 1 : 0) : setNo - 1));
+    return {
+      plannedExerciseCount: workout.exercises.length,
+      completedExerciseCount: Math.min(workout.exercises.length, idx + (currentCompleted >= exercise.sets ? 1 : 0)),
+      plannedSetCount,
+      completedSetCount: Math.min(plannedSetCount, completedBefore + currentCompleted),
+    };
+  }, [workout.exercises, idx, exercise.sets, phase, setNo]);
+
+  const finishSession = useCallback((status: 'completato' | 'interrotto', includeFinishedWork = false) => {
+    if (finalized.current) return;
+    finalized.current = true;
+    deadline.current = 0;
+    setRunning(false);
+    setPhase('done');
+    setFinishedStatus(status);
+    void allowScreenLock();
+    window.speechSynthesis?.cancel();
+    const endedAt = new Date().toISOString();
+    onComplete(startedAt.current ?? endedAt, endedAt, status, progressAtStop(includeFinishedWork));
+  }, [allowScreenLock, onComplete, progressAtStop]);
+
   const next = useCallback(() => {
     deadline.current = 0; spokenSecond.current = -1;
     if (phase === 'ready') { setPhase('work'); setLeft(exercise.work); return; }
     if (phase === 'work' && exercise.rest > 0) { setPhase('rest'); setLeft(exercise.rest); return; }
     if ((phase === 'work' || phase === 'rest') && setNo < exercise.sets) { setSetNo(n => n + 1); setPhase('ready'); setLeft(5); return; }
     if (idx < workout.exercises.length - 1) { setIdx(n => n + 1); setSetNo(1); setPhase('ready'); setLeft(5); return; }
-    setPhase('done'); setRunning(false); void allowScreenLock();
-    const endedAt = new Date().toISOString();
-    onComplete(startedAt.current ?? endedAt, endedAt);
-  }, [phase, exercise, setNo, idx, workout.exercises.length, onComplete, allowScreenLock]);
+    // Reaching this branch means the final work interval has elapsed, so count it as completed.
+    finishSession('completato', phase === 'work');
+  }, [phase, exercise, setNo, idx, workout.exercises.length, finishSession]);
 
   useEffect(() => {
     if (!running || phase === 'done') return;
@@ -103,8 +130,8 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
       spotifyStarted.current = true;
       void playSpotifyLink(getSpotifyLink());
     }
-    if (phase === 'done') say('Allenamento completato. Ottimo lavoro.');
-  }, [phase, running]);
+    if (phase === 'done' && finishedStatus === 'completato') say('Allenamento completato. Ottimo lavoro.');
+  }, [phase, running, finishedStatus]);
 
   const start = async () => {
     if (starting) return;
@@ -117,6 +144,8 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
       void keepScreenOn();
       activateSpotifyElement();
       await sayAndWait('Preparati');
+      // A termination during the spoken preparation must not restart the timer afterwards.
+      if (finalized.current) { setStarting(false); return; }
       // Spotify NON parte qui: il countdown 5-4-3-2-1 deve restare senza musica.
       // Il PLAY viene inviato solo al passaggio dalla fase ready alla fase work.
       setLeft(5);
@@ -134,9 +163,16 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
   };
   const pause = () => { setRunning(false); deadline.current = 0; if (isSpotifyLoggedIn()) pauseSpotifyPlayback(); };
   const reset = () => { setRunning(false); setIdx(0); setSetNo(1); setPhase('ready'); setLeft(5); deadline.current = 0; spokenSecond.current = -1; spotifyStarted.current = false; void allowScreenLock(); if (isSpotifyLoggedIn()) void pauseSpotifyPlayback(); window.speechSynthesis?.cancel(); };
-  const exitTimer = () => { void allowScreenLock(); window.speechSynthesis?.cancel(); onExit(); };
+  const terminateEarly = () => {
+    if (!startedAt.current || finalized.current) return;
+    if (window.confirm('Terminare prima l’allenamento? Verrà salvato come interrotto e non sbloccherà la prossima seduta.')) finishSession('interrotto');
+  };
+  const exitTimer = () => {
+    if (startedAt.current && !finalized.current) { terminateEarly(); return; }
+    void allowScreenLock(); window.speechSynthesis?.cancel(); onExit();
+  };
 
-  if (phase === 'done') return <div className="min-h-[80vh] flex items-center justify-center"><div className="card bg-base-200 text-center"><div className="card-body items-center"><CheckCircle2 size={72} className="text-success" /><h2 className="card-title text-2xl">Allenamento completato!</h2><p>Hai concluso {workout.title}. Recupera almeno 48 ore prima della prossima seduta pliometrica.</p><button className="btn btn-primary mt-3" onClick={exitTimer}>Torna al programma</button></div></div></div>;
+  if (phase === 'done') return <div className="min-h-[80vh] flex items-center justify-center"><div className="card bg-base-200 text-center"><div className="card-body items-center">{finishedStatus === 'completato' ? <CheckCircle2 size={72} className="text-success" /> : <Pause size={72} className="text-warning" />}<h2 className="card-title text-2xl">{finishedStatus === 'completato' ? 'Allenamento completato!' : 'Allenamento interrotto'}</h2><p>{finishedStatus === 'completato' ? `Hai concluso ${workout.title}. Recupera almeno 48 ore prima della prossima seduta pliometrica.` : 'La durata e i progressi svolti sono stati salvati. La prossima seduta resta bloccata.'}</p><button className="btn btn-primary mt-3" onClick={exitTimer}>Torna al programma</button></div></div></div>;
 
   const duration = phase === 'work' ? exercise.work : phase === 'rest' ? exercise.rest : 5;
   const pct = Math.max(0, Math.round(left / duration * 100));
@@ -144,6 +180,7 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
     <div className="flex justify-between items-center"><button className="btn btn-ghost btn-sm" onClick={exitTimer}><ArrowLeft size={18} /> Esci</button><span className="badge badge-outline">{idx + 1}/{workout.exercises.length}</span>{getSpotifyLink() && <button className="btn btn-ghost btn-sm btn-circle" onClick={openSpotify} aria-label="Apri Spotify"><Music size={18} /></button>}</div>
     <div className={`guided-main-card card ${phase === 'work' ? 'bg-primary text-primary-content' : phase === 'rest' ? 'bg-secondary text-secondary-content' : 'bg-base-200'}`}><div className="guided-main-body card-body p-5 items-center text-center"><div><span className="badge badge-lg">{phase === 'ready' ? 'CONTO ALLA ROVESCIA' : phase === 'work' ? 'LAVORO' : 'RECUPERO'}</span><h2 className="text-2xl font-bold mt-3">{exercise.name}</h2><p className="opacity-80">Serie {setNo} di {exercise.sets} · {exercise.prescription}</p></div><MovementAnimation kind={exercise.kind} active={running} id={exercise.id} /><div><div className="font-mono text-7xl font-black tabular-nums">{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</div><progress className="progress w-full mt-3" value={pct} max="100" /><p className="mt-3 font-medium">{exercise.cues.join(' · ')}</p></div></div></div>
     <div className="guided-controls grid grid-cols-4 gap-2"><button className="btn btn-ghost" onClick={reset}><RotateCcw /></button><button className="guided-start btn btn-primary col-span-2 btn-lg" disabled={starting} onClick={() => running ? pause() : void start()}>{starting ? <><Volume2 /> PREPARATI…</> : running ? <><Pause /> PAUSA</> : <><Play /> {startedAt.current ? 'RIPRENDI' : 'START'}</>}</button><button className="btn btn-ghost" onClick={next}><SkipForward /></button></div>
+    {startedAt.current && <button className="btn btn-error guided-terminate" onClick={terminateEarly}>TERMINA PRIMA</button>}
     <p className="text-xs text-center text-base-content/60 flex items-center justify-center gap-1"><Volume2 size={14} /> Annunci in cuffia · Schermo {screenKeptOn ? 'mantenuto acceso' : wakeLockSupported ? 'attivo allo START' : 'da mantenere acceso nelle impostazioni'}</p>
   </div>;
 };

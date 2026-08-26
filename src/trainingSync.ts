@@ -2,6 +2,7 @@ import type { SessionLog } from './types';
 
 export const SYNC_URL_KEY = 'scatto-forza-30-sync-url';
 export const SYNC_TOKEN_KEY = 'scatto-forza-30-sync-token';
+export const DEFAULT_SYNC_API_URL = 'https://pliometric-training-production.up.railway.app';
 
 export interface SyncConfig {
   apiUrl: string;
@@ -13,9 +14,16 @@ export interface SyncPayload {
   completedWorkoutIds: string[];
 }
 
+export interface SyncVerification {
+  localCount: number;
+  onlineCount: number;
+  verified: boolean;
+}
+
 export function readSyncConfig(): SyncConfig {
   return {
-    apiUrl: localStorage.getItem(SYNC_URL_KEY) ?? '',
+    // A ready-to-use endpoint reduces setup mistakes, but the personal key is never stored in source.
+    apiUrl: localStorage.getItem(SYNC_URL_KEY) || DEFAULT_SYNC_API_URL,
     token: localStorage.getItem(SYNC_TOKEN_KEY) ?? '',
   };
 }
@@ -47,12 +55,22 @@ export async function synchronizeTraining(payload: SyncPayload, config: SyncConf
   return response.json() as Promise<SyncPayload>;
 }
 
+/** A POST is successful only when Railway returns every record that was just sent. */
+export function verifyRemoteLogs(localLogs: SessionLog[], remoteLogs: SessionLog[]): SyncVerification {
+  const remoteIds = new Set(remoteLogs.map(log => log.id));
+  const missing = localLogs.filter(log => !remoteIds.has(log.id));
+  if (missing.length) {
+    throw new Error(`${missing.length} registr${missing.length === 1 ? 'o non è' : 'i non sono'} ancora confermat${missing.length === 1 ? 'o' : 'i'} online. Riprova l'invio.`);
+  }
+  return { localCount: localLogs.length, onlineCount: remoteLogs.length, verified: true };
+}
+
 export function mergeLogs(local: SessionLog[], remote: SessionLog[]): SessionLog[] {
   const merged = new Map<string, SessionLog>();
   [...remote, ...local].forEach(log => {
     const current = merged.get(log.id);
     if (!current) { merged.set(log.id, log); return; }
-    const score = (item: SessionLog) => (item.status === 'completato' ? 100 : 0)
+    const score = (item: SessionLog) => (item.status === 'completato' ? 200 : item.status === 'interrotto' ? 100 : 0)
       + (item.endedAt ? 20 : 0)
       + (item.runRepetitions?.length ?? 0) * 2
       + (item.totalDistanceMeters ? 1 : 0)

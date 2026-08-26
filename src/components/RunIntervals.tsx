@@ -37,6 +37,7 @@ export const RunIntervals: React.FC<Props> = ({ onExit, onComplete }) => {
   const [restLeft, setRestLeft] = useState(0);
   const [gpsError, setGpsError] = useState('');
   const [accuracy, setAccuracy] = useState<number | null>(null);
+  const [finishedStatus, setFinishedStatus] = useState<'completato' | 'interrotto' | null>(null);
   const { acquire: keepScreenOn, release: allowScreenLock, held: screenKeptOn, supported: wakeLockSupported } = useScreenWakeLock();
   const phaseRef = useRef<Phase>('setup');
   const repNoRef = useRef(1);
@@ -54,23 +55,36 @@ export const RunIntervals: React.FC<Props> = ({ onExit, onComplete }) => {
   const stopTimers = () => { if (repIntervalRef.current) { clearInterval(repIntervalRef.current); repIntervalRef.current = null; } if (restIntervalRef.current) { clearInterval(restIntervalRef.current); restIntervalRef.current = null; } };
   useEffect(() => () => { stopGeo(); stopTimers(); window.speechSynthesis?.cancel(); }, []);
 
-  function finishAll() {
-    if (phaseRef.current === 'done') return;
+  function finishSession(status: 'completato' | 'interrotto', includePartialRunningRep = false) {
+    if (phaseRef.current === 'done' || sessionSaved.current) return;
+    const endedAt = new Date().toISOString();
+    const repetitions = [...completedReps.current];
+    // Keep a genuinely measured partial rep when the runner chooses to stop mid-effort.
+    if (includePartialRunningRep && phaseRef.current === 'running') {
+      const durationSeconds = Math.max(1, Math.round((Date.now() - repStart.current) / 1000));
+      const distanceMeters = repDistanceRef.current;
+      if (distanceMeters >= 10 && durationSeconds >= 5) {
+        repetitions.push({ repetition: repNoRef.current, distanceMeters, durationSeconds, paceSecondsPerKm: durationSeconds / (distanceMeters / 1000) });
+      }
+    }
+    completedReps.current = repetitions;
     stopGeo(); stopTimers(); void allowScreenLock();
     phaseRef.current = 'done';
+    sessionSaved.current = true;
+    setFinishedStatus(status);
     setPhase('done');
-    say('Serie completata. Ottimo lavoro.');
-    if (!sessionSaved.current && sessionStartedAt.current && completedReps.current.length) {
-      sessionSaved.current = true;
-      onComplete({ startedAt: sessionStartedAt.current, endedAt: new Date().toISOString(), targetMeters, recoverySeconds: restSeconds, repetitions: [...completedReps.current] });
-    }
+    say(status === 'completato' ? 'Serie completata. Ottimo lavoro.' : 'Serie interrotta. I dati svolti sono stati salvati.');
+    if (sessionStartedAt.current) onComplete({ startedAt: sessionStartedAt.current, endedAt, targetMeters, recoverySeconds: restSeconds, repetitions, status });
   }
+
+  function finishAll() { finishSession('completato'); }
 
   function startRep(n: number) {
     if (n === 1) {
       completedReps.current = [];
       sessionStartedAt.current = new Date().toISOString();
       sessionSaved.current = false;
+      setFinishedStatus(null);
     }
     repNoRef.current = n;
     setRepNo(n); setRepDistance(0); repDistanceRef.current = 0; setRepElapsed(0); lastPos.current = null;
@@ -128,7 +142,10 @@ export const RunIntervals: React.FC<Props> = ({ onExit, onComplete }) => {
     }, 250);
   }
 
-  const stopAll = () => { stopGeo(); stopTimers(); void allowScreenLock(); window.speechSynthesis?.cancel(); phaseRef.current = 'setup'; completedReps.current = []; sessionStartedAt.current = ''; setGpsError(''); setAccuracy(null); setPhase('setup'); };
+  const terminateEarly = () => {
+    if (!sessionStartedAt.current || sessionSaved.current) return;
+    if (window.confirm('Terminare prima la serie? Verrà salvata come interrotta con le ripetute già svolte.')) finishSession('interrotto', phaseRef.current === 'running');
+  };
   const exitApp = () => { stopGeo(); stopTimers(); void allowScreenLock(); window.speechSynthesis?.cancel(); onExit(); };
   const paceSeconds = repElapsed > 0 && repDistance > 0 ? repElapsed / (repDistance / 1000) : null;
 
@@ -144,14 +161,19 @@ export const RunIntervals: React.FC<Props> = ({ onExit, onComplete }) => {
     <button className="btn btn-primary run-start" onClick={() => { void keepScreenOn(); activateSpotifyElement(); if (isSpotifyLoggedIn()) { playSpotifyLink(getSpotifyLink()).then(ok => { if (!ok) openSpotify(); }); } else { openSpotify(); } startRep(1); }}><Play fill="currentColor" /> INIZIA {reps} × {targetMeters} m</button>
   </div>;
 
-  if (phase === 'done') return <div className="app-shell run-shell run-done">
-    <section className="card bg-success text-success-content"><div className="card-body p-6 text-center"><h2 className="card-title justify-center text-2xl">Serie completata!</h2><p>{reps} ripetute da {targetMeters} m</p>{completedReps.current.length > 0 && <p>Passo medio: {formatPace(completedReps.current.reduce((s, r) => s + r.durationSeconds, 0) / (completedReps.current.reduce((s, r) => s + r.distanceMeters, 0) / 1000))}</p>}</div></section>
-    <button className="btn btn-primary btn-lg w-full" onClick={() => { phaseRef.current = 'setup'; setGpsError(''); setAccuracy(null); setPhase('setup'); }}><RotateCcw size={18} /> Nuova serie</button>
+  if (phase === 'done') {
+    const savedReps = completedReps.current;
+    const totalDistance = savedReps.reduce((sum, rep) => sum + rep.distanceMeters, 0);
+    const totalSeconds = savedReps.reduce((sum, rep) => sum + rep.durationSeconds, 0);
+    return <div className="app-shell run-shell run-done">
+    <section className={`card ${finishedStatus === 'interrotto' ? 'bg-base-200' : 'bg-success text-success-content'}`}><div className="card-body p-6 text-center"><h2 className="card-title justify-center text-2xl">{finishedStatus === 'interrotto' ? 'Serie interrotta' : 'Serie completata!'}</h2><p>{finishedStatus === 'interrotto' ? 'Le ripetute concluse e l’eventuale tratto GPS in corso sono stati salvati.' : `${reps} ripetute da ${targetMeters} m`}</p>{totalDistance > 0 && totalSeconds > 0 && <p>Passo medio corsa: {formatPace(totalSeconds / (totalDistance / 1000))}</p>}</div></section>
+    <button className="btn btn-primary btn-lg w-full" onClick={() => { phaseRef.current = 'setup'; completedReps.current = []; sessionStartedAt.current = ''; sessionSaved.current = false; setFinishedStatus(null); setGpsError(''); setAccuracy(null); setPhase('setup'); }}><RotateCcw size={18} /> Nuova serie</button>
     <button className="btn btn-ghost w-full" onClick={exitApp}><ArrowLeft size={18} /> Torna al programma</button>
   </div>;
+  }
 
   return <div className={`app-shell run-shell run-session run-${phase}`}>
-    <div className="run-toolbar"><button className="btn btn-ghost" onClick={stopAll}><ArrowLeft size={20} /> Esci</button><span className="run-rep-badge">RIPETUTA {repNo} / {reps}</span>{getSpotifyLink() ? <button className="btn btn-ghost btn-circle" onClick={openSpotify} aria-label="Apri Spotify"><Music size={20} /></button> : <span className="run-toolbar-spacer" />}</div>
+    <div className="run-toolbar"><button className="btn btn-error run-terminate" onClick={terminateEarly}>TERMINA PRIMA</button><span className="run-rep-badge">RIPETUTA {repNo} / {reps}</span>{getSpotifyLink() ? <button className="btn btn-ghost btn-circle" onClick={openSpotify} aria-label="Apri Spotify"><Music size={20} /></button> : <span className="run-toolbar-spacer" />}</div>
     {phase === 'running' && <section className="run-phase-card run-phase-work"><div className="run-phase-photo"><img src="./images/run-work.png" alt="Atleta che corre durante la ripetuta" /><strong>CORRI FORTE</strong></div><div className="run-phase-data"><span className="run-kicker">METRI PERCORSI</span><span className="run-distance">{Math.round(repDistance)}</span><span className="run-target">di {targetMeters} m</span><progress className="progress progress-secondary w-full" value={Math.min(repDistance, targetMeters)} max={targetMeters} /><div className="run-metrics"><span><Timer size={20} /> {Math.floor(repElapsed / 60)}:{String(repElapsed % 60).padStart(2, '0')}</span>{paceSeconds && <span>{formatPace(paceSeconds)}</span>}</div>{accuracy != null && <span className="run-accuracy">Precisione GPS: ±{Math.round(accuracy)} m · Schermo {screenKeptOn ? 'attivo' : wakeLockSupported ? 'non garantito' : 'da impostazioni telefono'}</span>}</div></section>}
     {phase === 'resting' && <section className="run-phase-card run-phase-rest"><div className="run-phase-photo"><img src="./images/run-recovery.png" alt="Atleta che cammina durante il recupero" /><strong>RECUPERO • CAMMINA</strong></div><div className="run-phase-data"><span className="run-kicker">PROSSIMA RIPETUTA TRA</span><span className="run-rest-time">{Math.floor(restLeft / 60)}:{String(restLeft % 60).padStart(2, '0')}</span><p className="run-fixed-note">Recupero fissato dal programma</p></div></section>}
     {gpsError && <div className="alert alert-error text-sm">{gpsError}</div>}

@@ -1,4 +1,4 @@
-name: Deploy su GitHub Pages
+name: Pubblica PWA su GitHub Pages
 
 on:
   push:
@@ -20,24 +20,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Node
+      - name: Configura Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
-
       - name: Installa dipendenze
         run: npm ci
-
-      - name: Build
+      - name: Build Vite
         run: npm run build
-
-      - name: Prepara artifact Pages
+      - name: Carica artefatto Pages
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
-
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -45,6 +40,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy su GitHub Pages
+      - name: Pubblica su Pages
         id: deployment
         uses: actions/deploy-pages@v4

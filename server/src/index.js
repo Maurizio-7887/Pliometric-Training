@@ -39,6 +39,15 @@ async function initializeDatabase() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    -- Older deployed databases only allow 'in_corso'/'completato'. Replace that
+    -- generated CHECK safely so interrupted sessions can be retained too.
+    DO $$
+    BEGIN
+      ALTER TABLE workout_sessions DROP CONSTRAINT IF EXISTS workout_sessions_status_check;
+      ALTER TABLE workout_sessions ADD CONSTRAINT workout_sessions_status_check
+        CHECK (status IN ('in_corso', 'completato', 'interrotto'));
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
     CREATE INDEX IF NOT EXISTS workout_sessions_started_at_idx ON workout_sessions (started_at DESC);
     CREATE INDEX IF NOT EXISTS workout_sessions_workout_id_idx ON workout_sessions (workout_id);
     CREATE TABLE IF NOT EXISTS training_state (
@@ -57,6 +66,7 @@ const safeEqual = (provided, expected) => {
 };
 
 const optionalFinite = (value, min, max) => value == null || (typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max);
+const optionalInteger = (value, min, max) => value == null || (Number.isInteger(value) && value >= min && value <= max);
 const validRepetition = rep => rep && Number.isInteger(rep.repetition) && rep.repetition > 0 && rep.repetition <= 100
   && optionalFinite(rep.distanceMeters, 0, 100000)
   && optionalFinite(rep.durationSeconds, 0, 86400)
@@ -69,8 +79,14 @@ const validLog = log => log && typeof log.id === 'string' && log.id.length > 0 &
   && optionalFinite(log.durationSeconds, 0, 2147483647) && (log.durationSeconds == null || Number.isInteger(log.durationSeconds))
   && optionalFinite(log.totalDistanceMeters, 0, 10000000)
   && optionalFinite(log.averagePaceSecondsPerKm, 0, 86400)
+  && optionalInteger(log.plannedExerciseCount, 0, 1000)
+  && optionalInteger(log.completedExerciseCount, 0, 1000)
+  && optionalInteger(log.plannedSetCount, 0, 10000)
+  && optionalInteger(log.completedSetCount, 0, 10000)
+  && (log.plannedExerciseCount == null || log.completedExerciseCount == null || log.completedExerciseCount <= log.plannedExerciseCount)
+  && (log.plannedSetCount == null || log.completedSetCount == null || log.completedSetCount <= log.plannedSetCount)
   && (log.runRepetitions == null || (Array.isArray(log.runRepetitions) && log.runRepetitions.length <= 100 && log.runRepetitions.every(validRepetition)))
-  && ['in_corso', 'completato'].includes(log.status);
+  && ['in_corso', 'completato', 'interrotto'].includes(log.status);
 
 const app = express();
 const publicDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../public');
@@ -141,11 +157,21 @@ app.post('/api/sync', async (req, res, next) => {
           started_at = EXCLUDED.started_at,
           ended_at = COALESCE(EXCLUDED.ended_at, workout_sessions.ended_at),
           duration_seconds = COALESCE(EXCLUDED.duration_seconds, workout_sessions.duration_seconds),
-          status = CASE WHEN workout_sessions.status = 'completato' THEN 'completato' ELSE EXCLUDED.status END,
+          status = CASE
+            WHEN workout_sessions.status = 'completato' OR EXCLUDED.status = 'completato' THEN 'completato'
+            WHEN workout_sessions.status = 'interrotto' OR EXCLUDED.status = 'interrotto' THEN 'interrotto'
+            ELSE 'in_corso'
+          END,
           run_repetitions = COALESCE(EXCLUDED.run_repetitions, workout_sessions.run_repetitions),
           total_distance_meters = COALESCE(EXCLUDED.total_distance_meters, workout_sessions.total_distance_meters),
           average_pace_seconds_per_km = COALESCE(EXCLUDED.average_pace_seconds_per_km, workout_sessions.average_pace_seconds_per_km),
-          payload = CASE WHEN workout_sessions.status = 'completato' THEN workout_sessions.payload ELSE EXCLUDED.payload END,
+          payload = CASE
+            WHEN workout_sessions.status = 'completato' THEN workout_sessions.payload
+            WHEN EXCLUDED.status = 'completato' THEN EXCLUDED.payload
+            WHEN workout_sessions.status = 'interrotto' THEN workout_sessions.payload
+            WHEN EXCLUDED.status = 'interrotto' THEN EXCLUDED.payload
+            ELSE EXCLUDED.payload
+          END,
           updated_at = NOW()
       `, [
         log.id, log.workoutId, log.workoutTitle, log.startedAt, log.endedAt ?? null,
