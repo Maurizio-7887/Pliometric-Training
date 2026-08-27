@@ -127,7 +127,7 @@ app.use(rateLimit({ windowMs: 60_000, limit: 90, standardHeaders: true, legacyHe
 // This is intentionally a read-only desktop surface. Its JavaScript asks for SYNC_KEY
 // in the browser and uses the existing authenticated /api/sync endpoint for all data.
 app.get(['/dashboard', '/dashboard/'], (_req, res) => res.sendFile(dashboardFile));
-app.use('/dashboard/assets', express.static(path.join(publicDirectory, 'assets'), { maxAge: '1d' }));
+app.use('/dashboard/assets', express.static(path.join(publicDirectory, 'assets'), { maxAge: 0 }));
 
 app.get('/health', async (_req, res) => {
   try { await pool.query('SELECT 1'); res.json({ ok: true, database: 'postgresql' }); }
