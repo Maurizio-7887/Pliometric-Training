@@ -14,6 +14,7 @@ const DATABASE_URL = process.env.DATABASE_URL;
 const SYNC_KEY = process.env.SYNC_KEY || '';
 const PAIRING_APP_URL = (process.env.PAIRING_APP_URL || '').trim().replace(/\/$/, '');
 const PUBLIC_API_URL = canonicalPublicApiUrl(process.env.PUBLIC_API_URL, { nodeEnv: process.env.NODE_ENV, port: PORT });
+const PUBLIC_ORIGIN = new URL(PUBLIC_API_URL).origin;
 const PAIRING_GLOBAL_LIMIT = positiveEnv(process.env.PAIRING_GLOBAL_LIMIT, 60, 'PAIRING_GLOBAL_LIMIT');
 const PAIRING_CODE_MAX_ATTEMPTS = positiveEnv(process.env.PAIRING_CODE_MAX_ATTEMPTS, 5, 'PAIRING_CODE_MAX_ATTEMPTS');
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'https://maurizio-7887.github.io')
@@ -130,7 +131,7 @@ app.set('trust proxy', 1);
 app.use(helmet());
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || ALLOWED_ORIGINS.includes(origin) || (process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin))) callback(null, true);
+    if (!origin || origin === PUBLIC_ORIGIN || ALLOWED_ORIGINS.includes(origin) || (process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin))) callback(null, true);
     else callback(new Error('Origine non autorizzata'));
   },
   methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
