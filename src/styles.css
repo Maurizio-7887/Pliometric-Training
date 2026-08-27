@@ -273,3 +273,14 @@ html { scroll-behavior: smooth; width: 100%; min-width: 100%; } body { min-heigh
  .home-choice-grid{flex:none!important;grid-template-rows:repeat(2,minmax(17rem,38dvh))!important}
  .home-secondary-actions{padding-bottom:1rem}
 }
+
+/* Velocità GPS ContaKM */
+.run-speed-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem;width:100%;margin-top:.15rem}
+.run-speed-grid>span{display:grid;grid-template-columns:1fr auto;align-items:end;padding:.65rem .45rem;border-radius:.7rem;background:var(--color-base-200);font-variant-numeric:tabular-nums}
+.run-speed-grid small{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:.25rem;font-size:.68rem;font-style:normal;font-weight:900;opacity:.72}
+.run-speed-grid b{justify-self:end;font-size:1.55rem;line-height:1;font-weight:950}
+.run-speed-grid em{font-size:.68rem;line-height:1.15;font-style:normal;font-weight:800}
+.history-repetition-speed span,.history-repetition-speed b{display:flex;flex-direction:column;gap:.18rem}
+.history-repetition-speed b{text-align:right}
+.history-repetition-speed small{font-size:.72em;font-weight:800;opacity:.72}
+@media(min-width:700px){.run-speed-grid>span{padding:1rem .75rem}.run-speed-grid small{font-size:.9rem}.run-speed-grid b{font-size:2.25rem}.run-speed-grid em{font-size:.85rem}}

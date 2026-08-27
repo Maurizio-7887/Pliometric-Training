@@ -20,6 +20,8 @@ export interface RunRepResult {
   distanceMeters: number;
   durationSeconds: number;
   paceSecondsPerKm: number;
+  averageSpeedKmh?: number;
+  maxSpeedKmh?: number;
 }
 
 export interface RunSessionSummary {
@@ -67,5 +69,5 @@ export interface Workout {
 }
 
 export interface TimerCheckpoint { kind: 'plyo'; workoutId: string; startedAt: string; idx: number; setNo: number; phase: 'ready' | 'work' | 'rest'; left: number; savedAt: string; }
-export interface RunCheckpoint { kind: 'run'; programId: '400' | '800' | '1000'; phase: 'running' | 'resting'; repNo: number; repDistance: number; repElapsed: number; restLeft: number; completedReps: RunRepResult[]; startedAt: string; savedAt: string; }
+export interface RunCheckpoint { kind: 'run'; programId: '400' | '800' | '1000'; phase: 'running' | 'resting'; repNo: number; repDistance: number; repElapsed: number; restLeft: number; repMaxSpeedKmh?: number; completedReps: RunRepResult[]; startedAt: string; savedAt: string; }
 export type ActiveSessionCheckpoint = TimerCheckpoint | RunCheckpoint;
