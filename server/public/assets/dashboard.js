@@ -7,6 +7,8 @@
     form: $('login-form'), key: $('sync-key'), loginError: $('login-error'), loginButton: $('login-button'),
     reveal: $('key-visibility'), refresh: $('refresh-button'), forget: $('forget-button'), state: $('connection-state'),
     retry: $('retry-button'), errorText: $('dashboard-error-text'),
+    pairingButton: $('pairing-button'), pairingResult: $('pairing-result'), pairingCode: $('pairing-code'),
+    pairingExpiry: $('pairing-expiry'), pairingError: $('pairing-error'),
   };
   let activeKey = '';
   let lastPayload = null;
@@ -290,8 +292,39 @@
     }
   }
 
+  async function generatePairingCode() {
+    if (!activeKey) { showLogin('Accedi prima con la SYNC_KEY per generare il codice.'); return; }
+    els.pairingButton.disabled = true;
+    els.pairingError.textContent = '';
+    els.pairingResult.classList.add('is-hidden');
+    try {
+      const response = await fetch('/api/pairings', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${activeKey}`, 'Content-Type': 'application/json' },
+      });
+      if (!response.ok) {
+        let message = '';
+        try { message = (await response.json())?.error || ''; } catch { /* use fallback */ }
+        throw new Error(message || `Impossibile generare il codice (${response.status}).`);
+      }
+      const data = await response.json();
+      if (!/^\d{6}$/.test(String(data.code || ''))) throw new Error('Il server non ha restituito un codice valido.');
+      els.pairingCode.textContent = data.code;
+      const expiresAt = Date.parse(data.expiresAt);
+      els.pairingExpiry.textContent = Number.isFinite(expiresAt)
+        ? `Valido fino alle ${new Intl.DateTimeFormat('it-IT', { hour: '2-digit', minute: '2-digit' }).format(new Date(expiresAt))}`
+        : 'Valido per 10 minuti';
+      els.pairingResult.classList.remove('is-hidden');
+    } catch (error) {
+      els.pairingError.textContent = error instanceof Error ? error.message : 'Errore durante la generazione del codice.';
+    } finally {
+      els.pairingButton.disabled = false;
+    }
+  }
+
   els.form.addEventListener('submit', event => { event.preventDefault(); loadData(els.key.value.trim(), true); });
   els.refresh.addEventListener('click', () => loadData(activeKey || localStorage.getItem(STORAGE_KEY) || ''));
+  els.pairingButton.addEventListener('click', generatePairingCode);
   els.retry.addEventListener('click', () => loadData(activeKey || localStorage.getItem(STORAGE_KEY) || ''));
   els.forget.addEventListener('click', () => { localStorage.removeItem(STORAGE_KEY); activeKey = ''; lastPayload = null; els.key.value = ''; showLogin(); });
   els.reveal.addEventListener('click', () => { const visible = els.key.type === 'text'; els.key.type = visible ? 'password' : 'text'; els.reveal.textContent = visible ? 'Mostra' : 'Nascondi'; });

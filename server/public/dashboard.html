@@ -7,6 +7,7 @@
   <title>Scatto Forza 30 · Analisi</title>
   <link rel="stylesheet" href="/dashboard/assets/dashboard.css" />
   <link rel="stylesheet" href="/dashboard/assets/dashboard-plyo.css" />
+  <link rel="stylesheet" href="/dashboard/assets/dashboard-pairing.css" />
 </head>
 <body>
   <main class="page-shell">
@@ -43,6 +44,23 @@
         <div><p class="eyebrow">CENTRALE ALLENAMENTI</p><h1>Buon lavoro, <span id="period-label">atleta</span>.</h1><p id="data-summary" class="muted">Caricamento delle sedute…</p></div>
         <div class="updated-box"><span>ULTIMO AGGIORNAMENTO</span><strong id="updated-at">—</strong></div>
       </div>
+
+      <section class="pairing-panel" aria-labelledby="pairing-title">
+        <div class="pairing-copy">
+          <p class="eyebrow">COLLEGA IL CELLULARE</p>
+          <h2 id="pairing-title">Associa un telefono</h2>
+          <p>Premi il pulsante e inserisci nell’app il codice monouso insieme al nome del dispositivo, per esempio <strong>HONOR200</strong>.</p>
+        </div>
+        <div class="pairing-actions">
+          <button id="pairing-button" class="button button-primary pairing-button" type="button">Genera codice di 6 cifre</button>
+          <div id="pairing-result" class="pairing-result is-hidden" aria-live="polite">
+            <span>CODICE MONOUSO</span>
+            <strong id="pairing-code">------</strong>
+            <small id="pairing-expiry">Valido per 10 minuti</small>
+          </div>
+          <p id="pairing-error" class="form-error" role="alert" aria-live="polite"></p>
+        </div>
+      </section>
 
       <section class="metric-grid" aria-label="Riepilogo allenamenti">
         <article class="metric-card"><span>Sedute completate</span><strong id="metric-sessions">—</strong><small id="metric-sessions-note">nel registro</small></article>
