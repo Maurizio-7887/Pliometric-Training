@@ -1,53 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Cloud, CloudOff, RefreshCw, Save, ShieldCheck } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { Cloud, CloudOff, Link, RefreshCw, ShieldCheck } from 'lucide-react';
 import type { SyncConfig, SyncVerification } from '../trainingSync';
-import { isSyncConfigured } from '../trainingSync';
-
-interface Props {
-  config: SyncConfig;
-  syncState: 'non_configurata' | 'sincronizzazione' | 'sincronizzata' | 'offline' | 'errore';
-  lastSyncAt: string | null;
-  syncError: string;
-  verification: SyncVerification | null;
-  onSaveConfig: (config: SyncConfig) => void;
-  onSyncNow: () => void;
-}
-
-const stateText = (state: Props['syncState']) => {
-  if (state === 'sincronizzata') return 'Verificato online';
-  if (state === 'sincronizzazione') return 'Verifica in corso…';
-  if (state === 'offline') return 'Offline · verrà inviato al ritorno della rete';
-  if (state === 'errore') return 'Invio da riprovare';
-  return 'Non collegato';
-};
-
-/** Compact phone-only setup. Detailed analysis lives only on the protected Railway dashboard. */
-export const MobileSyncSettings: React.FC<Props> = ({ config, syncState, lastSyncAt, syncError, verification, onSaveConfig, onSyncNow }) => {
-  const [open, setOpen] = useState(false);
-  const [apiUrl, setApiUrl] = useState(config.apiUrl);
-  const [token, setToken] = useState(config.token);
-  const configured = isSyncConfigured(config);
-  const Icon = configured ? Cloud : CloudOff;
-
-  useEffect(() => {
-    setApiUrl(config.apiUrl);
-    setToken(config.token);
-  }, [config.apiUrl, config.token]);
-
-  return <section className="card bg-base-200 mobile-sync"><div className="card-body p-4 gap-3">
-    <div className="flex items-center gap-2"><Icon size={19} className="text-primary" /><div><h2 className="font-bold">Salvataggio online</h2><p className="text-xs text-base-content/60">Ogni invio viene controllato contro il registro Railway.</p></div><span className="badge badge-outline ml-auto">{stateText(syncState)}</span></div>
-    {verification?.verified && <div className="sync-verification"><ShieldCheck size={18} /><span><strong>Confermato:</strong> {verification.localCount}/{verification.localCount} registri locali presenti online <small>· {verification.onlineCount} totali su Railway</small></span></div>}
-    {lastSyncAt && <p className="text-xs text-base-content/60">Ultima verifica: {new Intl.DateTimeFormat('it-IT', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(lastSyncAt))}</p>}
-    {syncError && <div className="alert alert-error text-sm">{syncError}</div>}
-    <div className="mobile-sync-actions">
-      <button className="btn btn-ghost btn-sm" onClick={() => setOpen(value => !value)}>{open ? 'Chiudi collegamento' : configured ? 'Modifica collegamento' : 'Collega questo dispositivo'}</button>
-      {configured && <button className="btn btn-sm" disabled={syncState === 'sincronizzazione'} onClick={onSyncNow}><RefreshCw size={15} /> Verifica ora</button>}
-    </div>
-    {open && <div className="mobile-sync-form">
-      <label className="sync-field"><span>Indirizzo API Railway</span><input type="url" inputMode="url" placeholder="https://pliometric-training-production.up.railway.app" value={apiUrl} onChange={event => setApiUrl(event.target.value)} /></label>
-      <label className="sync-field"><span>Chiave personale</span><input type="password" autoComplete="off" placeholder="La SYNC_KEY configurata su Railway" value={token} onChange={event => setToken(event.target.value)} /></label>
-      <button className="btn btn-primary" onClick={() => onSaveConfig({ apiUrl, token })}><Save size={16} /> Salva e verifica</button>
-      <p className="text-xs text-base-content/60">Al primo invio vengono caricati anche tutti i registri già presenti in questo telefono. La chiave resta solo su questo dispositivo.</p>
-    </div>}
-  </div></section>;
-};
+import { DEFAULT_SYNC_API_URL, isSyncConfigured } from '../trainingSync';
+interface Props { config: SyncConfig; syncState: 'non_configurata' | 'sincronizzazione' | 'sincronizzata' | 'offline' | 'errore'; lastSyncAt: string | null; syncError: string; verification: SyncVerification | null; pairingInProgress: boolean; onPair: (apiUrl: string, code: string, label: string) => Promise<void>; onSyncNow: () => void; }
+const stateText = (state: Props['syncState']) => state === 'sincronizzata' ? 'Online verificato' : state === 'sincronizzazione' ? 'Invio in corso…' : state === 'offline' ? 'Offline · coda salvata' : state === 'errore' ? 'Invio da riprovare' : 'Non collegato';
+export const MobileSyncSettings: React.FC<Props> = ({ config, syncState, lastSyncAt, syncError, verification, pairingInProgress, onPair, onSyncNow }) => { const pendingCode = localStorage.getItem('scatto-forza-30-pending-pair-code') || '', pendingApi = localStorage.getItem('scatto-forza-30-pending-pair-api') || '', pendingApiRef = useRef(pendingApi); const [open, setOpen] = useState(Boolean(pendingCode)), [apiUrl, setApiUrl] = useState(pendingApi || config.apiUrl || DEFAULT_SYNC_API_URL), [code, setCode] = useState(pendingCode), [label, setLabel] = useState('Questo telefono'); const configured = isSyncConfigured(config), Icon = configured ? Cloud : CloudOff; useEffect(() => { if (!pendingApiRef.current) setApiUrl(config.apiUrl || DEFAULT_SYNC_API_URL); }, [config.apiUrl]); return <section className="card bg-base-200 mobile-sync"><div className="card-body p-4 gap-3"><div className="flex items-center gap-2"><Icon size={19} className="text-primary" /><div><h2 className="font-bold">Salvataggio online</h2><p className="text-xs text-base-content/60">Coda persistente: i dati partono appena torna la rete.</p></div><span className="badge badge-outline ml-auto">{stateText(syncState)}</span></div>{verification?.verified && <div className="sync-verification"><ShieldCheck size={18} /><span><strong>Confermato:</strong> {verification.localCount} elementi della coda ricevuti <small>· {verification.onlineCount} registri totali</small></span></div>}{lastSyncAt && <p className="text-xs text-base-content/60">Ultima verifica: {new Intl.DateTimeFormat('it-IT', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(lastSyncAt))}</p>}{syncError && <div className="alert alert-error text-sm">{syncError}</div>}<div className="mobile-sync-actions"><button className="btn btn-ghost btn-sm" disabled={pairingInProgress} onClick={() => setOpen(v => !v)}>{open ? 'Chiudi' : configured ? 'Associa un altro dispositivo' : 'Associa questo dispositivo'}</button>{configured && <button className="btn btn-sm" disabled={syncState === 'sincronizzazione' || pairingInProgress} onClick={onSyncNow}><RefreshCw size={15} /> Invia ora</button>}</div>{open && <form className="mobile-sync-form" onSubmit={event => { event.preventDefault(); if (!pairingInProgress) void onPair(apiUrl, code, label); }}><label className="sync-field"><span>Codice monouso (6 cifre)</span><input disabled={pairingInProgress} inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required placeholder="123456" value={code} onChange={event => setCode(event.target.value.replace(/\D/g, ''))} /></label><label className="sync-field"><span>Nome dispositivo</span><input disabled={pairingInProgress} maxLength={80} value={label} onChange={event => setLabel(event.target.value)} /></label><details><summary>Indirizzo Railway (solo se il link non lo ha già compilato)</summary><label className="sync-field mt-2"><span>Indirizzo API Railway</span><input disabled={pairingInProgress} inputMode="url" required value={apiUrl} onChange={event => { pendingApiRef.current = ''; setApiUrl(event.target.value); }} placeholder="https://…up.railway.app" /></label></details><button className="btn btn-primary w-full" disabled={pairingInProgress} type="submit"><Link size={16} /> {pairingInProgress ? 'ASSOCIAZIONE…' : 'ASSOCIA E INVIA'}</button></form>}</div></section>; };

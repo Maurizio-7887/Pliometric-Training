@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, CheckCircle2, Music, Pause, Play, RotateCcw, SkipForward, Volume2 } from 'lucide-react';
-import type { PlyoProgress, Workout } from '../types';
+import type { PlyoProgress, TimerCheckpoint, Workout } from '../types';
 import { MovementAnimation } from './MovementAnimation';
 import { getSpotifyLink, openSpotify } from '../spotify';
 import { isSpotifyLoggedIn } from '../spotifyAuth';
@@ -8,7 +8,7 @@ import { activateSpotifyElement, pauseSpotifyPlayback, playSpotifyLink, prepareS
 import { useScreenWakeLock } from '../useScreenWakeLock';
 
 type Phase = 'ready' | 'work' | 'rest' | 'done';
-interface Props { workout: Workout; onExit: () => void; onStart: (startedAt: string) => void; onComplete: (startedAt: string, endedAt: string, status: 'completato' | 'interrotto', progress: PlyoProgress) => void; }
+interface Props { workout: Workout; checkpoint?: TimerCheckpoint | null; onCheckpoint: (checkpoint: TimerCheckpoint | null) => void; onExit: () => void; onStart: (startedAt: string) => void; onComplete: (startedAt: string, endedAt: string, status: 'completato' | 'interrotto', progress: PlyoProgress) => void; }
 
 const say = (text: string) => {
   if (!('speechSynthesis' in window)) return;
@@ -43,14 +43,16 @@ const beep = () => {
   } catch { /* audio facoltativo */ }
 };
 
-export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onComplete }) => {
-  const [idx, setIdx] = useState(0);
-  const [setNo, setSetNo] = useState(1);
-  const [phase, setPhase] = useState<Phase>('ready');
-  const [left, setLeft] = useState(5);
+export const GuidedTimer: React.FC<Props> = ({ workout, checkpoint, onCheckpoint, onExit, onStart, onComplete }) => {
+  const restored = checkpoint?.kind === 'plyo' && checkpoint.workoutId === workout.id ? checkpoint : null;
+  const [idx, setIdx] = useState(restored?.idx ?? 0);
+  const [setNo, setSetNo] = useState(restored?.setNo ?? 1);
+  const [phase, setPhase] = useState<Phase>(restored?.phase ?? 'ready');
+  const [left, setLeft] = useState(restored?.left ?? 5);
   const [running, setRunning] = useState(false);
+  const [resumedFromCheckpoint, setResumedFromCheckpoint] = useState(false);
   const [starting, setStarting] = useState(false);
-  const startedAt = useRef<string | null>(null);
+  const startedAt = useRef<string | null>(restored?.startedAt ?? null);
   const deadline = useRef(0);
   const spokenSecond = useRef(-1);
   const spotifyStarted = useRef(false);
@@ -78,6 +80,7 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
 
   const finishSession = useCallback((status: 'completato' | 'interrotto', includeFinishedWork = false) => {
     if (finalized.current) return;
+    onCheckpoint(null);
     finalized.current = true;
     deadline.current = 0;
     setRunning(false);
@@ -87,7 +90,7 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
     window.speechSynthesis?.cancel();
     const endedAt = new Date().toISOString();
     onComplete(startedAt.current ?? endedAt, endedAt, status, progressAtStop(includeFinishedWork));
-  }, [allowScreenLock, onComplete, progressAtStop]);
+  }, [allowScreenLock, onCheckpoint, onComplete, progressAtStop]);
 
   const next = useCallback(() => {
     deadline.current = 0; spokenSecond.current = -1;
@@ -135,6 +138,7 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
 
   const start = async () => {
     if (starting) return;
+    setResumedFromCheckpoint(true);
     const firstStart = !startedAt.current;
     if (firstStart) {
       setStarting(true);
@@ -161,8 +165,10 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
     }
     void keepScreenOn();
   };
-  const pause = () => { setRunning(false); deadline.current = 0; if (isSpotifyLoggedIn()) pauseSpotifyPlayback(); };
-  const reset = () => { setRunning(false); setIdx(0); setSetNo(1); setPhase('ready'); setLeft(5); deadline.current = 0; spokenSecond.current = -1; spotifyStarted.current = false; void allowScreenLock(); if (isSpotifyLoggedIn()) void pauseSpotifyPlayback(); window.speechSynthesis?.cancel(); };
+  const saveCheckpoint = () => { if (startedAt.current && !finalized.current && phase !== 'done') onCheckpoint({ kind: 'plyo', workoutId: workout.id, startedAt: startedAt.current, idx, setNo, phase, left, savedAt: new Date().toISOString() }); };
+  const pause = () => { if (!running && !startedAt.current) return; setRunning(false); deadline.current = 0; void allowScreenLock(); if (isSpotifyLoggedIn()) void pauseSpotifyPlayback(); saveCheckpoint(); };
+  useEffect(() => { const background = () => pause(); const visibility = () => { if (document.visibilityState === 'hidden') background(); }; document.addEventListener('visibilitychange', visibility); window.addEventListener('pagehide', background); return () => { document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pagehide', background); }; }, [pause]);
+  const reset = () => { if (startedAt.current && !finalized.current) { const endedAt = new Date().toISOString(); onComplete(startedAt.current, endedAt, 'interrotto', progressAtStop()); } startedAt.current = null; finalized.current = false; setResumedFromCheckpoint(false); onCheckpoint(null); setRunning(false); setStarting(false); setIdx(0); setSetNo(1); setPhase('ready'); setLeft(5); deadline.current = 0; spokenSecond.current = -1; spotifyStarted.current = false; void allowScreenLock(); if (isSpotifyLoggedIn()) void pauseSpotifyPlayback(); window.speechSynthesis?.cancel(); };
   const terminateEarly = () => {
     if (!startedAt.current || finalized.current) return;
     if (window.confirm('Terminare prima l’allenamento? Verrà salvato come interrotto e non sbloccherà la prossima seduta.')) finishSession('interrotto');
@@ -178,6 +184,7 @@ export const GuidedTimer: React.FC<Props> = ({ workout, onExit, onStart, onCompl
   const pct = Math.max(0, Math.round(left / duration * 100));
   return <div className="guided-timer min-h-screen flex flex-col gap-4 pb-5">
     <div className="flex justify-between items-center"><button className="btn btn-ghost btn-sm" onClick={exitTimer}><ArrowLeft size={18} /> Esci</button><span className="badge badge-outline">{idx + 1}/{workout.exercises.length}</span>{getSpotifyLink() && <button className="btn btn-ghost btn-sm btn-circle" onClick={openSpotify} aria-label="Apri Spotify"><Music size={18} /></button>}</div>
+    {restored && !resumedFromCheckpoint && !running && <div className="alert alert-info text-sm">Seduta ripristinata in pausa: premi RIPRENDI per continuare.</div>}
     <div className={`guided-main-card card ${phase === 'work' ? 'bg-primary text-primary-content' : phase === 'rest' ? 'bg-secondary text-secondary-content' : 'bg-base-200'}`}><div className="guided-main-body card-body p-5 items-center text-center"><div><span className="badge badge-lg">{phase === 'ready' ? 'CONTO ALLA ROVESCIA' : phase === 'work' ? 'LAVORO' : 'RECUPERO'}</span><h2 className="text-2xl font-bold mt-3">{exercise.name}</h2><p className="opacity-80">Serie {setNo} di {exercise.sets} · {exercise.prescription}</p></div><MovementAnimation kind={exercise.kind} active={running} id={exercise.id} /><div><div className="font-mono text-7xl font-black tabular-nums">{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</div><progress className="progress w-full mt-3" value={pct} max="100" /><p className="mt-3 font-medium">{exercise.cues.join(' · ')}</p></div></div></div>
     <div className="guided-controls grid grid-cols-4 gap-2"><button className="btn btn-ghost" onClick={reset}><RotateCcw /></button><button className="guided-start btn btn-primary col-span-2 btn-lg" disabled={starting} onClick={() => running ? pause() : void start()}>{starting ? <><Volume2 /> PREPARATI…</> : running ? <><Pause /> PAUSA</> : <><Play /> {startedAt.current ? 'RIPRENDI' : 'START'}</>}</button><button className="btn btn-ghost" onClick={next}><SkipForward /></button></div>
     {startedAt.current && <button className="btn btn-error guided-terminate" onClick={terminateEarly}>TERMINA PRIMA</button>}

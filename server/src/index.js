@@ -6,11 +6,16 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import pg from 'pg';
+import { canonicalPublicApiUrl, positiveEnv } from './config.js';
 
 const { Pool } = pg;
 const PORT = Number(process.env.PORT || 3000);
 const DATABASE_URL = process.env.DATABASE_URL;
 const SYNC_KEY = process.env.SYNC_KEY || '';
+const PAIRING_APP_URL = (process.env.PAIRING_APP_URL || '').trim().replace(/\/$/, '');
+const PUBLIC_API_URL = canonicalPublicApiUrl(process.env.PUBLIC_API_URL, { nodeEnv: process.env.NODE_ENV, port: PORT });
+const PAIRING_GLOBAL_LIMIT = positiveEnv(process.env.PAIRING_GLOBAL_LIMIT, 60, 'PAIRING_GLOBAL_LIMIT');
+const PAIRING_CODE_MAX_ATTEMPTS = positiveEnv(process.env.PAIRING_CODE_MAX_ATTEMPTS, 5, 'PAIRING_CODE_MAX_ATTEMPTS');
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'https://maurizio-7887.github.io')
   .split(',').map(value => value.trim()).filter(Boolean);
 
@@ -56,9 +61,24 @@ async function initializeDatabase() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
     INSERT INTO training_state (singleton) VALUES (TRUE) ON CONFLICT (singleton) DO NOTHING;
+    CREATE TABLE IF NOT EXISTS device_tokens (
+      id UUID PRIMARY KEY, token_hash TEXT UNIQUE NOT NULL, label TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), last_used_at TIMESTAMPTZ, revoked_at TIMESTAMPTZ
+    );
+    CREATE TABLE IF NOT EXISTS pairing_codes (
+      code_hash TEXT PRIMARY KEY, expires_at TIMESTAMPTZ NOT NULL, used_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), attempts SMALLINT NOT NULL DEFAULT 0
+    );
+    ALTER TABLE pairing_codes ADD COLUMN IF NOT EXISTS attempts SMALLINT NOT NULL DEFAULT 0;
+    CREATE INDEX IF NOT EXISTS pairing_codes_expires_at_idx ON pairing_codes (expires_at);
+    CREATE TABLE IF NOT EXISTS pairing_attempt_limits (scope TEXT PRIMARY KEY, window_started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), attempts INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE IF NOT EXISTS pairing_code_attempts (code_hash TEXT PRIMARY KEY, attempts SMALLINT NOT NULL DEFAULT 0, last_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
   `);
 }
 
+const hash = value => crypto.createHash('sha256').update(value).digest('hex');
+const randomToken = () => crypto.randomBytes(32).toString('base64url');
+const randomCode = () => String(crypto.randomInt(100000, 1000000));
 const safeEqual = (provided, expected) => {
   const a = Buffer.from(provided || '');
   const b = Buffer.from(expected || '');
@@ -95,10 +115,10 @@ app.set('trust proxy', 1);
 app.use(helmet());
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || ALLOWED_ORIGINS.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) callback(null, true);
+    if (!origin || ALLOWED_ORIGINS.includes(origin) || (process.env.NODE_ENV !== 'production' && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin))) callback(null, true);
     else callback(new Error('Origine non autorizzata'));
   },
-  methods: ['GET', 'POST', 'OPTIONS'],
+  methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json({ limit: '2mb' }));
@@ -114,11 +134,44 @@ app.get('/health', async (_req, res) => {
   catch { res.status(503).json({ ok: false }); }
 });
 
-app.use('/api', (req, res, next) => {
+async function authenticate(req, res, next) {
   const provided = req.get('authorization')?.replace(/^Bearer\s+/i, '') || '';
-  if (!safeEqual(provided, SYNC_KEY)) return res.status(401).json({ error: 'Chiave personale non valida' });
-  next();
+  if (safeEqual(provided, SYNC_KEY)) { req.auth = { kind: 'owner' }; return next(); }
+  if (!provided) return res.status(401).json({ error: 'Dispositivo non associato' });
+  try {
+    const result = await pool.query('SELECT id FROM device_tokens WHERE token_hash = $1 AND revoked_at IS NULL', [hash(provided)]);
+    if (!result.rowCount) return res.status(401).json({ error: 'Token dispositivo non valido o revocato' });
+    req.auth = { kind: 'device', id: result.rows[0].id };
+    void pool.query('UPDATE device_tokens SET last_used_at = NOW() WHERE id = $1', [result.rows[0].id]);
+    next();
+  } catch (error) { next(error); }
+}
+const ownerOnly = (req, res, next) => req.auth?.kind === 'owner' ? next() : res.status(403).json({ error: 'Operazione riservata al proprietario' });
+
+const pairingIpLimit = rateLimit({ windowMs: 10 * 60_000, limit: 20, standardHeaders: true, legacyHeaders: false, message: { error: 'Troppi tentativi di associazione. Riprova tra qualche minuto.' } });
+// PostgreSQL makes this a true account-scoped limit even if the service is scaled horizontally.
+async function consumeGlobalPairingAttempt(client) { const result = await client.query(`INSERT INTO pairing_attempt_limits (scope, window_started_at, attempts) VALUES ('default', NOW(), 1) ON CONFLICT (scope) DO UPDATE SET window_started_at = CASE WHEN pairing_attempt_limits.window_started_at < NOW() - INTERVAL '10 minutes' THEN NOW() ELSE pairing_attempt_limits.window_started_at END, attempts = CASE WHEN pairing_attempt_limits.window_started_at < NOW() - INTERVAL '10 minutes' THEN 1 ELSE pairing_attempt_limits.attempts + 1 END RETURNING attempts`); return result.rows[0].attempts <= PAIRING_GLOBAL_LIMIT; }
+async function consumeCodeAttempt(client, codeHash) { const result = await client.query(`INSERT INTO pairing_code_attempts (code_hash, attempts) VALUES ($1, 1) ON CONFLICT (code_hash) DO UPDATE SET attempts = pairing_code_attempts.attempts + 1, last_attempt_at = NOW() RETURNING attempts`, [codeHash]); return result.rows[0].attempts <= PAIRING_CODE_MAX_ATTEMPTS; }
+app.post('/api/pair', pairingIpLimit, async (req, res, next) => {
+  const code = String(req.body?.code || '').replace(/\D/g, '');
+  const label = String(req.body?.label || 'Telefono').trim().slice(0, 80) || 'Telefono';
+  if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Inserisci il codice di sei cifre.' });
+  // Persist failed attempts outside the token transaction: a rollback must never erase throttling.
+  const codeHash = hash(code);
+  if (!await consumeGlobalPairingAttempt(pool)) return res.status(429).json({ error: 'Limite globale di associazioni raggiunto. Riprova tra qualche minuto.' });
+  if (!await consumeCodeAttempt(pool, codeHash)) return res.status(429).json({ error: 'Numero massimo di tentativi per questo codice raggiunto.' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query(`UPDATE pairing_codes SET used_at = NOW() WHERE code_hash = $1 AND used_at IS NULL AND expires_at > NOW() RETURNING code_hash`, [codeHash]);
+    if (!result.rowCount) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Codice non valido, già usato o scaduto.' }); }
+    const token = randomToken();
+    await client.query('INSERT INTO device_tokens (id, token_hash, label) VALUES ($1,$2,$3)', [crypto.randomUUID(), hash(token), label]);
+    await client.query('COMMIT');
+    res.json({ token, apiUrl: PUBLIC_API_URL });
+  } catch (error) { await client.query('ROLLBACK'); next(error); } finally { client.release(); }
 });
+app.use('/api', authenticate);
 
 async function readAll(client = pool) {
   const [sessions, state] = await Promise.all([
@@ -194,6 +247,29 @@ app.post('/api/sync', async (req, res, next) => {
     await client.query('ROLLBACK');
     next(error);
   } finally { client.release(); }
+});
+
+app.post('/api/pairings', ownerOnly, async (req, res, next) => {
+  try {
+    await pool.query('DELETE FROM pairing_codes WHERE expires_at < NOW() OR used_at IS NOT NULL');
+    await pool.query(`DELETE FROM pairing_code_attempts WHERE last_attempt_at < NOW() - INTERVAL '1 hour'`);
+    let code = ''; let inserted = false;
+    for (let attempt = 0; attempt < 5 && !inserted; attempt += 1) {
+      code = randomCode();
+      try { await pool.query(`INSERT INTO pairing_codes (code_hash, expires_at) VALUES ($1, NOW() + INTERVAL '10 minutes')`, [hash(code)]); inserted = true; }
+      catch (error) { if (error.code !== '23505') throw error; }
+    }
+    if (!inserted) throw new Error('Impossibile generare un codice');
+    const apiUrl = PUBLIC_API_URL;
+    const pairingUrl = PAIRING_APP_URL ? (() => { const url = new URL(PAIRING_APP_URL); url.searchParams.set('pairing', code); url.searchParams.set('api', apiUrl); return url.toString(); })() : null;
+    res.status(201).json({ code, expiresAt: new Date(Date.now() + 600000).toISOString(), pairingUrl });
+  } catch (error) { next(error); }
+});
+app.get('/api/devices', ownerOnly, async (_req, res, next) => {
+  try { const { rows } = await pool.query('SELECT id,label,created_at,last_used_at,revoked_at FROM device_tokens ORDER BY created_at DESC'); res.json({ devices: rows.map(row => ({ id: row.id, label: row.label, createdAt: row.created_at, lastUsedAt: row.last_used_at, revokedAt: row.revoked_at })) }); } catch (error) { next(error); }
+});
+app.delete('/api/devices/:id', ownerOnly, async (req, res, next) => {
+  try { const result = await pool.query('UPDATE device_tokens SET revoked_at=NOW() WHERE id=$1 AND revoked_at IS NULL', [req.params.id]); if (!result.rowCount) return res.status(404).json({ error: 'Dispositivo non trovato o già revocato' }); res.status(204).end(); } catch (error) { next(error); }
 });
 
 app.use((error, _req, res, _next) => {

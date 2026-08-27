@@ -1,78 +1,43 @@
 # Railway — Scatto Forza 30
 
-Il servizio Railway conserva il registro condiviso della PWA e serve il **dashboard desktop di sola analisi**. L’app GitHub Pages rimane invece l’esperienza mobile per RIPETUTE, PLIOMETRIA e registro.
+Il servizio Railway contiene **un solo registro del proprietario** e serve il dashboard desktop. La PWA GitHub Pages resta l'interfaccia mobile per allenarsi e usa token per singolo dispositivo, non la chiave master.
 
-## 1. Crea PostgreSQL
+## Distribuzione
 
-Nel progetto Railway crea un servizio **PostgreSQL**. Railway può esporre `DATABASE_URL` al servizio API tramite riferimento a variabile. Il database e la chiave non devono essere inseriti nel repository.
+1. Nel progetto Railway crea PostgreSQL.
+2. Crea un servizio dal repository `Maurizio-7887/Pliometric-Training`, con **Root Directory** `/server`, **Start Command** `npm start` e healthcheck `/health`.
+3. Genera un dominio pubblico HTTPS e verifica `https://<servizio>.up.railway.app/health`. La risposta attesa è `{"ok":true,"database":"postgresql"}`.
 
-## 2. Crea il servizio API dal repository GitHub
+All'avvio il server crea/migra automaticamente le vecchie tabelle `workout_sessions` e `training_state`, quindi i registri già esistenti restano disponibili. Aggiunge anche `pairing_codes` e `device_tokens`.
 
-Aggiungi un servizio dal repository `Maurizio-7887/Pliometric-Training` e configura:
+## Variabili Railway
 
-- **Root Directory:** `/server`
-- **Start Command:** `npm start` (normalmente rilevato in automatico)
-- **Healthcheck Path:** `/health`
+| Variabile | Obbligatoria | Valore |
+| --- | --- | --- |
+| `DATABASE_URL` | sì | riferimento al servizio PostgreSQL |
+| `SYNC_KEY` | sì | chiave master casuale del proprietario, almeno 24 caratteri (40+ consigliati) |
+| `ALLOWED_ORIGINS` | sì | es. `https://maurizio-7887.github.io`; più origini separate da virgole, senza slash finale |
+| `PUBLIC_API_URL` | sì in produzione | URL HTTPS canonico pubblico dell’API, es. `https://<servizio>.up.railway.app`; non usare URL di preview né host derivati dalla richiesta |
+| `PAIRING_APP_URL` | consigliata | URL completo della PWA Pages, es. `https://maurizio-7887.github.io/Pliometric-Training/`; abilita il link copiabile di associazione |
+| `PAIRING_GLOBAL_LIMIT` | no | tentativi di pairing per account/servizio ogni 10 minuti (default `60`) |
+| `PAIRING_CODE_MAX_ATTEMPTS` | no | tentativi consentiti per lo stesso codice inserito (default `5`) |
+| `PGSSLMODE` | no | `disable` nella rete privata Railway; `require` solo per PostgreSQL SSL pubblico |
 
-Il server inizializza automaticamente le tabelle `workout_sessions` e `training_state` al primo avvio.
+Non mettere mai `DATABASE_URL` o `SYNC_KEY` nel repository, nel link di pairing o nel telefono. Se `PAIRING_APP_URL` manca il dashboard mostra comunque il codice breve, ma non il link copiabile.
 
-## 3. Variabili del servizio API
+## Flusso proprietario/dispositivi
 
-Imposta nelle **Variables**:
+1. Apri `https://<servizio>.up.railway.app/dashboard` sul desktop e accedi con `SYNC_KEY`. La chiave viene mantenuta solo nel localStorage di quel browser; **Esci** la rimuove.
+2. Nella sezione **Dispositivi** scegli **Genera codice**. Ogni codice ha sei cifre, è monouso e scade dopo 10 minuti. I tentativi sono limitati sia per IP, sia globalmente per servizio, sia per singolo codice.
+3. Copia il link proposto sul telefono, oppure digita il codice nella PWA in **Registro allenamenti**. Il pairing restituisce un token random al dispositivo una sola volta; Railway conserva soltanto SHA-256 del token.
+4. Il dashboard elenca i dispositivi e permette **Revoca**. Dopo la revoca il token riceve 401 e il telefono deve essere associato di nuovo.
 
-| Variabile | Valore |
-| --- | --- |
-| `DATABASE_URL` | riferimento alla variabile del servizio PostgreSQL |
-| `SYNC_KEY` | chiave casuale personale di almeno 24 caratteri; consigliati 40+ |
-| `ALLOWED_ORIGINS` | `https://maurizio-7887.github.io` (aggiungi altri domini Pages separandoli con virgole, se necessari) |
-| `PGSSLMODE` | `disable` per API e PostgreSQL nella rete privata Railway; `require` solo per un database SSL pubblico |
+`/api/sync` accetta sia token dispositivo sia `SYNC_KEY` per continuità delle installazioni precedenti. Usa questa compatibilità solo per migrare: associando il telefono si sostituisce la chiave master memorizzata dal client. Il dashboard e le API di generazione/revoca restano riservati alla chiave master.
 
-Non pubblicare mai `DATABASE_URL` o `SYNC_KEY`. La `SYNC_KEY` è la stessa da inserire una volta nel telefono e nel browser desktop.
+## Diagnostica
 
-## 4. Dominio e verifica
-
-In **Settings → Networking** genera un dominio pubblico HTTPS, per esempio:
-
-```text
-https://nome-servizio.up.railway.app
-```
-
-Controlla prima la salute del servizio:
-
-```text
-https://nome-servizio.up.railway.app/health
-```
-
-La risposta attesa è:
-
-```json
-{"ok":true,"database":"postgresql"}
-```
-
-## 5. Collega la PWA mobile
-
-Nella PWA GitHub Pages apri **Registro allenamenti** e, nella scheda **Salvataggio online**, scegli **Collega questo dispositivo**. Inserisci:
-
-1. l’indirizzo API Railway completo (senza `/api/sync`);
-2. la stessa `SYNC_KEY` delle Variables.
-
-Dopo **Salva collegamento**, le sedute restano registrate anche offline e vengono inviate automaticamente al ritorno della rete. Il pulsante **Invia ora** serve solo a forzare l’invio: la PWA non espone grafici o analisi desktop.
-
-## 6. Apri l’analisi sul PC
-
-Su un computer visita:
-
-```text
-https://nome-servizio.up.railway.app/dashboard
-```
-
-Il dashboard chiede la `SYNC_KEY` nel browser, poi legge i record dall’endpoint già autenticato `/api/sync`. La chiave viene salvata nel `localStorage` **solo di quel browser**, non nei link né nel database. Usa **Esci** nel dashboard per rimuoverla dal browser.
-
-Il dashboard non contiene comandi per avviare allenamenti: mostra soltanto riepilogo delle sedute, chilometri GPS, passo per 400/800/1.000 m, tendenze, volume recente, consigli e registro recente.
-
-## Risoluzione problemi
-
-- **401 / “chiave non valida”**: verifica che PWA e dashboard usino esattamente la `SYNC_KEY` attuale del servizio Railway.
-- **Errore CORS nella PWA**: aggiungi l’esatto dominio GitHub Pages a `ALLOWED_ORIGINS`, senza slash finale, quindi ridistribuisci o riavvia il servizio.
-- **Dashboard senza sedute**: apri la PWA e usa **Invia ora** dopo aver completato una seduta; controlla quindi `/health` e riprova il dashboard.
-- **PWA offline**: i record rimangono nel browser e vengono ritentati quando la rete torna disponibile.
+- **401 token non valido/revocato**: genera un nuovo codice nel dashboard e associa nuovamente quel dispositivo.
+- **URL pubblico**: in produzione imposta sempre `PUBLIC_API_URL` HTTPS; il server rifiuta HTTP. In sviluppo accetta il fallback `http://localhost:<PORT>`.
+- **CORS**: aggiungi l'origine esatta di GitHub Pages a `ALLOWED_ORIGINS`, poi riavvia/ridistribuisci il servizio.
+- **Link non disponibile**: valorizza `PAIRING_APP_URL` con l'URL effettivo della PWA, incluso eventuale sottopercorso.
+- **Dati in attesa**: la PWA conserva la outbox finché `/api/sync` non conferma i record; aprila online o usa **Invia ora**.

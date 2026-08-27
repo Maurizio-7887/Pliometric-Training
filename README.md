@@ -1,66 +1,43 @@
 # Scatto Forza 30 — PWA
 
-Versione autonoma e installabile dello **Scatto Forza 30**. Include il programma completo di 4 settimane e 12 allenamenti, sagome atletiche professionali con movimenti tecnici fluidi, timer guidato, segnali acustici e voce italiana. Registra automaticamente allenamento, data, ora di inizio, ora di fine, durata effettiva e stato. Non richiede il runtime Tasklet: progressi e registro sono salvati nel `localStorage` del dispositivo.
+PWA installabile per il programma di pliometria e le ripetute GPS. Funziona prima di tutto in locale; opzionalmente sincronizza il registro su un servizio Railway privato, con dashboard desktop per il solo proprietario.
 
-## Requisiti
+## Sviluppo e pubblicazione
 
-- Node.js 18+ (consigliato Node.js 20+)
-- npm
-
-## Avvio locale
+Richiede Node.js 20+ e npm:
 
 ```bash
-npm install
+npm ci
 npm run dev
-```
-
-Apri l'indirizzo mostrato da Vite (di solito `http://localhost:5173`). Per simulare la versione pubblicata:
-
-```bash
 npm run build
 npm run preview
 ```
 
-La cartella `dist/` è già inclusa nel pacchetto e viene rigenerata da `npm run build`.
+Il workflow GitHub Pages esegue `npm ci` e `npm run build` a ogni push su `main`. `vite.config.ts` usa URL relativi, quindi l'app funziona anche sotto `https://utente.github.io/nome-repository/`.
 
-## Pubblicazione su GitHub Pages
+Per installarla, visita l'URL HTTPS di Pages da Chrome Android (**Installa app/Aggiungi a schermata Home**) o Safari iOS (**Condividi → Aggiungi a schermata Home**). Voice, GPS e Wake Lock dipendono dal browser e dai permessi del telefono.
 
-1. Crea un repository GitHub e copia dentro il repository tutti i file di questa cartella (oppure usa il contenuto come base del repository).
-2. Esegui `npm install` e `npm run build`.
-3. Il workflow già incluso in `.github/workflows/deploy-pages.yml` esegue `npm ci`, `npm run build` e pubblica automaticamente `dist` su GitHub Pages a ogni push su `main`.
-4. Nel repository apri **Settings → Pages** e imposta **Source: GitHub Actions**. Dopo il primo workflow completato troverai l'URL pubblico nella sezione Pages e nella pagina dell'esecuzione Actions.
-5. In alternativa, puoi usare un tuo workflow o pubblicare `dist` con il metodo Pages supportato dal tuo repository.
+## Dati, ripresa e offline
 
-Il progetto usa `base: './'` in `vite.config.ts` e URL relativi nel manifest/service worker: funziona anche dentro un sottopercorso del tipo `https://utente.github.io/nome-repo/`.
+- Progressi e registro sono mantenuti nel `localStorage` (`scatto-forza-30-progress` e `scatto-forza-30-session-log`). Le installazioni precedenti con questi nomi continuano a funzionare.
+- Un checkpoint della seduta guidata o delle ripetute è salvato localmente. Alla riapertura viene proposta la ripresa **in pausa**: countdown, recupero e GPS non avanzano durante la chiusura/offline.
+- Le modifiche da inviare sono conservate nella outbox `scatto-forza-30-sync-outbox`. Se la rete o Railway non sono disponibili, restano nella coda e vengono ritentate al ritorno online o con **Invia ora**.
+- Il service worker mette in cache soltanto app shell e asset statici dello stesso sito; non intercetta API o richieste cross-origin e non conserva risposte di sincronizzazione.
+- Da Registro allenamenti, **Cancella dati locali** pulisce solo questo dispositivo e disattiva la reimportazione automatica delle vecchie copie Railway. Il database remoto non viene cancellato.
 
-## Installazione su smartphone
+## Collegare un telefono a Railway
 
-### Android (Chrome)
+La chiave `SYNC_KEY` è la chiave master del proprietario: non va copiata sui telefoni nuovi. Il server deve definire `PUBLIC_API_URL` come URL HTTPS canonico pubblico: il pairing e il QR/link non deducono più l’host dalla richiesta.
 
-1. Apri l'URL HTTPS di GitHub Pages in Chrome.
-2. Attendi il primo caricamento (serve a preparare la cache offline).
-3. Apri il menu ⋮ e scegli **Installa app** (o **Aggiungi a schermata Home**).
-4. Conferma. L'app si aprirà in modalità autonoma.
+1. Configura e apri il dashboard Railway come descritto in [`server/RAILWAY.md`](server/RAILWAY.md).
+2. Nel dashboard autenticato, genera un codice di associazione: è di 6 cifre, monouso e valido 10 minuti.
+3. Sul telefono apri **Registro allenamenti → Associa questo dispositivo**, inserisci codice e nome del telefono. In alternativa usa il link copiabile creato dal dashboard: compila automaticamente codice e server.
+4. Il server restituisce un token casuale, conservato localmente dal telefono. Nel database viene conservato esclusivamente il suo hash. Il proprietario può revocarlo dal dashboard; quel telefono dovrà poi associarsi di nuovo.
 
-### iPhone/iPad (Safari)
+Le configurazioni precedenti che conservavano la chiave nel vecchio storage `scatto-forza-30-sync-token` restano leggibili per consentire la migrazione. Associa il dispositivo appena possibile per sostituire tale chiave master con un token revocabile.
 
-1. Apri l'URL HTTPS in Safari.
-2. Tocca **Condividi**.
-3. Scegli **Aggiungi alla schermata Home** e conferma.
+## Limiti
 
-Su iPhone la voce guidata dipende dal volume/silenzioso e dalle impostazioni di iOS; avvia il timer con un gesto dopo aver collegato le cuffie.
-
-## Dati e offline
-
-- I completamenti sono memorizzati localmente con la chiave `scatto-forza-30-progress`.
-- Il registro delle sedute è memorizzato con la chiave `scatto-forza-30-session-log`.
-- Per impostazione predefinita i dati restano locali. Facoltativamente, dalla sezione **Registro allenamenti** puoi collegare un servizio Railway personale: le sedute vengono inviate automaticamente anche a PostgreSQL e possono essere lette dal dashboard desktop Railway `/dashboard` con la stessa chiave personale.
-- Il service worker (`public/sw.js`) mette in cache il guscio dell'app e le risorse caricate, così l'app può essere usata offline dopo la prima visita.
-- Per azzerare il programma, cancella i dati del sito dal browser oppure esegui in console: `localStorage.removeItem('scatto-forza-30-progress')`.
-
-## Limiti noti
-
-- La sintesi vocale usa `SpeechSynthesis` del browser e le voci/lingue disponibili sul dispositivo; alcune versioni iOS richiedono che il timer sia avviato con un tocco.
-- Il blocco schermo (`Wake Lock`) è facoltativo e dipende dal browser.
-- GitHub Pages deve essere servito in HTTPS per installazione PWA, service worker e Wake Lock.
-- La pagina pubblicata deve usare un server HTTP(S): aprire `dist/index.html` direttamente come file locale può impedire service worker e alcune API.
+- Il token dispositivo è in `localStorage`, quindi la protezione del telefono/browser rimane importante. Non è una soluzione per account multiutente: il servizio gestisce volutamente un solo proprietario e un solo registro condiviso.
+- Le tracce GPS sono stime e dipendono dal segnale. Una seduta ripresa richiede di riattivare il GPS dal pulsante **RIPRENDI**.
+- La cache offline richiede almeno una prima visita riuscita e non può aggiornare l'app senza rete.
