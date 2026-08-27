@@ -203,3 +203,17 @@ html { scroll-behavior: smooth; width: 100%; min-width: 100%; } body { min-heigh
 .btn-error{background:#a83b32;color:#fff}.badge-error{background:#a83b32;color:#fff}.text-warning{color:var(--color-warning)}
 .guided-terminate{width:100%;min-height:3.1rem;border-radius:.55rem;font-weight:900;letter-spacing:.045em}.run-terminate{min-height:2.6rem;padding:.45rem .65rem;font-size:.72rem;font-weight:900;letter-spacing:.035em}.home-sync-status{margin:0;padding:0 .25rem;color:color-mix(in srgb,var(--color-base-content) 63%,transparent);font-size:.7rem;line-height:1.25;text-align:center}.home-sync-status.is-verified{color:var(--color-primary);font-weight:700}.sync-verification{display:flex;align-items:flex-start;gap:.5rem;padding:.65rem .7rem;border-radius:.55rem;background:color-mix(in srgb,var(--color-primary) 14%,var(--color-base-100));color:var(--color-base-content);font-size:.78rem;line-height:1.25}.sync-verification svg{flex:0 0 auto;color:var(--color-primary)}.sync-verification small{color:color-mix(in srgb,var(--color-base-content) 65%,transparent)}
 @media (max-width:380px){.run-terminate{font-size:.62rem;padding:.35rem}.run-toolbar{gap:.2rem}.home-sync-status{font-size:.65rem}}
+
+/* Azioni essenziali sempre grandi e riconoscibili sul telefono. */
+.alert-info{background:color-mix(in srgb,#2878b5 18%,var(--color-base-100));color:var(--color-base-content)}
+.resume-session-btn{width:100%;min-height:4.6rem;border:0;border-radius:.7rem;padding:.75rem 1rem;display:flex;align-items:center;gap:.85rem;background:#176b38;color:#fff;text-align:left;box-shadow:0 5px 16px rgba(0,0,0,.2)}
+.resume-session-btn>svg{flex:0 0 auto}.resume-session-btn span{display:flex;min-width:0;flex-direction:column;gap:.18rem}.resume-session-btn strong{font-size:1.05rem;line-height:1.1;letter-spacing:.025em}.resume-session-btn small{font-size:.78rem;line-height:1.2;opacity:.9}
+.registry-button{min-height:3.5rem!important;border:2px solid color-mix(in srgb,var(--color-primary) 65%,transparent);font-size:.95rem!important;font-weight:900!important;letter-spacing:.02em}
+.mobile-page-nav{display:grid;grid-template-columns:auto 1fr;gap:.55rem}.mobile-page-nav>.btn{min-height:3.5rem;font-size:.9rem;font-weight:900}
+@media(max-width:640px){
+  .home-shell{height:auto;min-height:100dvh;overflow:visible}
+  .home-choice-grid{flex:none;grid-template-rows:repeat(2,minmax(10.5rem,31dvh))}
+  .home-secondary-actions{flex:0 0 auto}
+  .resume-session-btn{min-height:4.9rem;position:relative;z-index:3}
+  .registry-button{min-height:3.8rem!important}
+}
