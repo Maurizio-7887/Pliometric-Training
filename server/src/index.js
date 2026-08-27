@@ -73,6 +73,21 @@ async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS pairing_codes_expires_at_idx ON pairing_codes (expires_at);
     CREATE TABLE IF NOT EXISTS pairing_attempt_limits (scope TEXT PRIMARY KEY, window_started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), attempts INTEGER NOT NULL DEFAULT 0);
     CREATE TABLE IF NOT EXISTS pairing_code_attempts (code_hash TEXT PRIMARY KEY, attempts SMALLINT NOT NULL DEFAULT 0, last_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+    -- Dedicated v2 tables avoid any incompatible schema left by an earlier
+    -- partial deployment. They contain pairing data only, never workouts.
+    CREATE TABLE IF NOT EXISTS pairing_v2_codes (
+      code_hash TEXT PRIMARY KEY, expires_at TIMESTAMPTZ NOT NULL,
+      used_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS pairing_v2_codes_expires_at_idx ON pairing_v2_codes (expires_at);
+    CREATE TABLE IF NOT EXISTS pairing_v2_limits (
+      scope TEXT PRIMARY KEY, window_started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      attempts INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS pairing_v2_attempts (
+      code_hash TEXT PRIMARY KEY, attempts INTEGER NOT NULL DEFAULT 0,
+      last_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
   `);
 }
 
@@ -150,8 +165,8 @@ const ownerOnly = (req, res, next) => req.auth?.kind === 'owner' ? next() : res.
 
 const pairingIpLimit = rateLimit({ windowMs: 10 * 60_000, limit: 20, standardHeaders: true, legacyHeaders: false, message: { error: 'Troppi tentativi di associazione. Riprova tra qualche minuto.' } });
 // PostgreSQL makes this a true account-scoped limit even if the service is scaled horizontally.
-async function consumeGlobalPairingAttempt(client) { const result = await client.query(`INSERT INTO pairing_attempt_limits (scope, window_started_at, attempts) VALUES ('default', NOW(), 1) ON CONFLICT (scope) DO UPDATE SET window_started_at = CASE WHEN pairing_attempt_limits.window_started_at < NOW() - INTERVAL '10 minutes' THEN NOW() ELSE pairing_attempt_limits.window_started_at END, attempts = CASE WHEN pairing_attempt_limits.window_started_at < NOW() - INTERVAL '10 minutes' THEN 1 ELSE pairing_attempt_limits.attempts + 1 END RETURNING attempts`); return result.rows[0].attempts <= PAIRING_GLOBAL_LIMIT; }
-async function consumeCodeAttempt(client, codeHash) { const result = await client.query(`INSERT INTO pairing_code_attempts (code_hash, attempts) VALUES ($1, 1) ON CONFLICT (code_hash) DO UPDATE SET attempts = pairing_code_attempts.attempts + 1, last_attempt_at = NOW() RETURNING attempts`, [codeHash]); return result.rows[0].attempts <= PAIRING_CODE_MAX_ATTEMPTS; }
+async function consumeGlobalPairingAttempt(client) { const result = await client.query(`INSERT INTO pairing_v2_limits (scope, window_started_at, attempts) VALUES ('default', NOW(), 1) ON CONFLICT (scope) DO UPDATE SET window_started_at = CASE WHEN pairing_v2_limits.window_started_at < NOW() - INTERVAL '10 minutes' THEN NOW() ELSE pairing_v2_limits.window_started_at END, attempts = CASE WHEN pairing_v2_limits.window_started_at < NOW() - INTERVAL '10 minutes' THEN 1 ELSE pairing_v2_limits.attempts + 1 END RETURNING attempts`); return result.rows[0].attempts <= PAIRING_GLOBAL_LIMIT; }
+async function consumeCodeAttempt(client, codeHash) { const result = await client.query(`INSERT INTO pairing_v2_attempts (code_hash, attempts) VALUES ($1, 1) ON CONFLICT (code_hash) DO UPDATE SET attempts = pairing_v2_attempts.attempts + 1, last_attempt_at = NOW() RETURNING attempts`, [codeHash]); return result.rows[0].attempts <= PAIRING_CODE_MAX_ATTEMPTS; }
 app.post('/api/pair', pairingIpLimit, async (req, res, next) => {
   const code = String(req.body?.code || '').replace(/\D/g, '');
   const label = String(req.body?.label || 'Telefono').trim().slice(0, 80) || 'Telefono';
@@ -163,7 +178,7 @@ app.post('/api/pair', pairingIpLimit, async (req, res, next) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const result = await client.query(`UPDATE pairing_codes SET used_at = NOW() WHERE code_hash = $1 AND used_at IS NULL AND expires_at > NOW() RETURNING code_hash`, [codeHash]);
+    const result = await client.query(`UPDATE pairing_v2_codes SET used_at = NOW() WHERE code_hash = $1 AND used_at IS NULL AND expires_at > NOW() RETURNING code_hash`, [codeHash]);
     if (!result.rowCount) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Codice non valido, già usato o scaduto.' }); }
     const token = randomToken();
     await client.query('INSERT INTO device_tokens (id, token_hash, label) VALUES ($1,$2,$3)', [crypto.randomUUID(), hash(token), label]);
@@ -251,12 +266,12 @@ app.post('/api/sync', async (req, res, next) => {
 
 app.post('/api/pairings', ownerOnly, async (req, res, next) => {
   try {
-    await pool.query('DELETE FROM pairing_codes WHERE expires_at < NOW() OR used_at IS NOT NULL');
-    await pool.query(`DELETE FROM pairing_code_attempts WHERE last_attempt_at < NOW() - INTERVAL '1 hour'`);
+    await pool.query('DELETE FROM pairing_v2_codes WHERE expires_at < NOW() OR used_at IS NOT NULL');
+    await pool.query(`DELETE FROM pairing_v2_attempts WHERE last_attempt_at < NOW() - INTERVAL '1 hour'`);
     let code = ''; let inserted = false;
     for (let attempt = 0; attempt < 5 && !inserted; attempt += 1) {
       code = randomCode();
-      try { await pool.query(`INSERT INTO pairing_codes (code_hash, expires_at) VALUES ($1, NOW() + INTERVAL '10 minutes')`, [hash(code)]); inserted = true; }
+      try { await pool.query(`INSERT INTO pairing_v2_codes (code_hash, expires_at) VALUES ($1, NOW() + INTERVAL '10 minutes')`, [hash(code)]); inserted = true; }
       catch (error) { if (error.code !== '23505') throw error; }
     }
     if (!inserted) throw new Error('Impossibile generare un codice');
