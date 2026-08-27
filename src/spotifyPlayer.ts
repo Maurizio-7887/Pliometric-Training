@@ -5,6 +5,7 @@ type SpotifyPlayerInstance = {
   connect: () => Promise<boolean>;
   activateElement?: () => Promise<void>;
   addListener: (event: string, cb: (data: unknown) => void) => void;
+  disconnect?: () => void;
 };
 declare global {
   interface Window {
@@ -38,20 +39,37 @@ async function ensurePlayerReady(): Promise<string | null> {
   readyPromise = (async () => {
     await loadSdkScript();
     if (!window.Spotify) return null;
+    player?.disconnect?.();
     player = new window.Spotify.Player({
       name: 'Scatto Forza 30',
       getOAuthToken: (cb: (t: string) => void) => { getValidSpotifyToken().then(t => cb(t ?? '')); },
       volume: 0.6,
     });
     return new Promise<string | null>(resolve => {
-      player?.addListener('ready', (data: unknown) => { const id = (data as { device_id: string }).device_id; deviceId = id; resolve(id); });
-      player?.addListener('not_ready', () => { deviceId = null; });
-      player?.addListener('initialization_error', () => resolve(null));
-      player?.addListener('authentication_error', () => resolve(null));
-      player?.connect();
+      let settled = false;
+      const finish = (id: string | null) => {
+        if (settled) return;
+        settled = true;
+        if (!id) readyPromise = null; // consente un nuovo tentativo dopo un errore temporaneo
+        resolve(id);
+      };
+      const timeout = window.setTimeout(() => finish(null), 10000);
+      player?.addListener('ready', (data: unknown) => {
+        window.clearTimeout(timeout);
+        const id = (data as { device_id: string }).device_id;
+        deviceId = id;
+        finish(id);
+      });
+      player?.addListener('not_ready', () => { deviceId = null; readyPromise = null; });
+      player?.addListener('initialization_error', () => { window.clearTimeout(timeout); finish(null); });
+      player?.addListener('authentication_error', () => { window.clearTimeout(timeout); finish(null); });
+      player?.addListener('account_error', () => { window.clearTimeout(timeout); finish(null); });
+      player?.connect().catch(() => { window.clearTimeout(timeout); finish(null); });
     });
   })();
-  return readyPromise;
+  const ready = await readyPromise;
+  if (!ready) readyPromise = null;
+  return ready;
 }
 
 /** Da chiamare sincronicamente dentro il gesto dell'utente (es. onClick) per sbloccare l'audio sui browser più restrittivi. */
@@ -79,28 +97,36 @@ export async function playSpotifyLink(link: string): Promise<boolean> {
   const uri = playlistToUri(link);
   if (!uri) return false;
   const token = await getValidSpotifyToken();
-  const device = await ensurePlayerReady();
-  if (!token || !device) return false;
-  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  if (!token) return false;
   const playBody = uri.startsWith('spotify:track:') ? { uris: [uri] } : { context_uri: uri };
-  try {
-    // Rende esplicitamente attivo il lettore dell'app prima del PLAY: evita che
-    // Spotify mantenga come destinazione un telefono/PC usato in precedenza.
-    await fetch('https://api.spotify.com/v1/me/player', {
-      method: 'PUT', headers,
-      body: JSON.stringify({ device_ids: [device], play: false }),
-    });
-    const play = () => fetch(`https://api.spotify.com/v1/me/player/play?device_id=${device}`, {
-      method: 'PUT', headers, body: JSON.stringify(playBody),
-    });
-    let res = await play();
-    // Il trasferimento del dispositivo può richiedere qualche istante su mobile.
-    if (!res.ok && res.status !== 204) {
-      await new Promise(resolve => window.setTimeout(resolve, 350));
-      res = await play();
+
+  // Tre tentativi coprono i ritardi più comuni del lettore Spotify su telefono.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const device = await ensurePlayerReady();
+    if (!device) {
+      await new Promise(resolve => window.setTimeout(resolve, 500 * (attempt + 1)));
+      continue;
     }
-    return res.ok || res.status === 204;
-  } catch { return false; }
+    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    try {
+      const transfer = await fetch('https://api.spotify.com/v1/me/player', {
+        method: 'PUT', headers,
+        body: JSON.stringify({ device_ids: [device], play: false }),
+      });
+      if (!transfer.ok && transfer.status !== 204) {
+        await new Promise(resolve => window.setTimeout(resolve, 500 * (attempt + 1)));
+        continue;
+      }
+      await new Promise(resolve => window.setTimeout(resolve, attempt === 0 ? 250 : 500));
+      const res = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${device}`, {
+        method: 'PUT', headers, body: JSON.stringify(playBody),
+      });
+      if (res.ok || res.status === 204) return true;
+      if (res.status === 404) { deviceId = null; readyPromise = null; }
+    } catch { /* ritenta */ }
+    await new Promise(resolve => window.setTimeout(resolve, 500 * (attempt + 1)));
+  }
+  return false;
 }
 
 export async function pauseSpotifyPlayback(): Promise<void> {
