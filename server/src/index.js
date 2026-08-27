@@ -261,7 +261,19 @@ app.post('/api/pairings', ownerOnly, async (req, res, next) => {
     }
     if (!inserted) throw new Error('Impossibile generare un codice');
     const apiUrl = PUBLIC_API_URL;
-    const pairingUrl = PAIRING_APP_URL ? (() => { const url = new URL(PAIRING_APP_URL); url.searchParams.set('pairing', code); url.searchParams.set('api', apiUrl); return url.toString(); })() : null;
+    let pairingUrl = null;
+    if (PAIRING_APP_URL) {
+      try {
+        const url = new URL(PAIRING_APP_URL);
+        url.searchParams.set('pairing', code);
+        url.searchParams.set('api', apiUrl);
+        pairingUrl = url.toString();
+      } catch {
+        // The deep link is optional: a bad deployment value must never prevent
+        // the owner from receiving and entering the six-digit code manually.
+        console.warn('PAIRING_APP_URL non valido: generazione del codice manuale mantenuta');
+      }
+    }
     res.status(201).json({ code, expiresAt: new Date(Date.now() + 600000).toISOString(), pairingUrl });
   } catch (error) { next(error); }
 });
