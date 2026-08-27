@@ -239,3 +239,37 @@ html { scroll-behavior: smooth; width: 100%; min-width: 100%; } body { min-heigh
  .resume-session-btn{min-height:9rem;padding:1.6rem 2rem;gap:1.5rem}.resume-session-btn>svg{width:3.2rem;height:3.2rem}.resume-session-btn strong{font-size:2.15rem}.resume-session-btn small{font-size:1.4rem}.registry-button{min-height:7rem!important;font-size:1.8rem!important}.registry-button svg{width:2.3rem;height:2.3rem}.registry-button .badge{font-size:1.3rem}
  .history-home-btn{min-height:6.5rem;padding:1.2rem 1.7rem;font-size:1.7rem}.history-home-btn svg{width:2.2rem;height:2.2rem}.workout-history{gap:1.5rem}.history-heading{gap:1.4rem;padding:.7rem}.history-icon{width:5rem;height:5rem}.history-icon svg{width:3rem;height:3rem}.history-heading h1{font-size:2.7rem}.history-heading p{font-size:1.5rem}.history-list{gap:1.4rem}.history-card{padding:1.7rem;border-radius:1.2rem}.history-card-title>strong{font-size:2rem}.history-status{padding:.65rem .9rem;font-size:1.25rem}.history-dates{gap:1rem;margin-top:1.5rem}.history-dates>div{gap:.8rem;padding:1.2rem}.history-dates svg{width:2rem;height:2rem}.history-dates span{font-size:1.15rem}.history-dates b{font-size:1.55rem}.history-duration{gap:.8rem;margin-top:1rem;padding:1.2rem;font-size:1.45rem}.history-duration svg{width:2rem;height:2rem}.history-duration b{font-size:1.6rem}.history-progress span,.history-run-summary span{padding:1.2rem;font-size:1.25rem}.history-progress b,.history-run-summary b{font-size:1.55rem}.history-repetitions>div{padding:1rem 1.2rem;font-size:1.4rem}.history-empty{padding:2rem;font-size:1.6rem}.history-clear{min-height:6rem;font-size:1.5rem}
 }
+
+/* Modalità telefono temporanea: controlli volutamente extralarge. Verrà ridotta per la versione PC. */
+.resume-session-btn{min-height:10rem!important;padding:1.8rem 2rem!important;gap:1.5rem!important;border-radius:1rem!important}
+.resume-session-btn>svg{width:3.5rem!important;height:3.5rem!important}
+.resume-session-btn strong{font-size:2.3rem!important;line-height:1.05!important}
+.resume-session-btn small{font-size:1.45rem!important;margin-top:.4rem}
+.home-secondary-actions{gap:1rem!important}
+.home-secondary-actions .registry-button{min-height:7.5rem!important;padding:1.2rem 1.5rem!important;font-size:2rem!important;border-radius:.8rem!important}
+.home-secondary-actions .registry-button svg{width:2.7rem!important;height:2.7rem!important}
+.home-secondary-actions .registry-button .badge{padding:.45rem .7rem!important;font-size:1.45rem!important}
+.home-sync-status{padding:.5rem 1rem!important;font-size:1.35rem!important;line-height:1.35!important;font-weight:700!important}
+.home-secondary-actions>.btn-ghost{min-height:6rem!important;padding:1rem!important;font-size:1.65rem!important;border:2px solid var(--color-base-300)!important;border-radius:.8rem!important}
+.home-secondary-actions>.btn-ghost svg{width:2.2rem!important;height:2.2rem!important}
+.home-secondary-actions .card-body{padding:1.5rem!important;font-size:1.35rem!important;line-height:1.45!important}
+
+.history-home-btn{min-height:7rem!important;padding:1.5rem 2rem!important;font-size:2rem!important}
+.history-home-btn svg{width:2.8rem!important;height:2.8rem!important}
+.history-heading{gap:1.5rem!important;padding:1rem!important}
+.history-icon{width:6rem!important;height:6rem!important}.history-icon svg{width:3.5rem!important;height:3.5rem!important}
+.history-heading h1{font-size:3.2rem!important}.history-heading p{font-size:1.7rem!important}
+.history-list{gap:1.6rem!important}.history-card{padding:2rem!important;border-radius:1.25rem!important}
+.history-card-title>strong{font-size:2.35rem!important}.history-status{padding:.8rem 1.1rem!important;font-size:1.45rem!important}
+.history-dates{gap:1rem!important;margin-top:1.5rem!important}.history-dates>div{gap:1rem!important;padding:1.4rem!important}
+.history-dates svg{width:2.4rem!important;height:2.4rem!important}.history-dates span{font-size:1.35rem!important}.history-dates b{font-size:1.9rem!important}
+.history-duration{gap:1rem!important;margin-top:1.2rem!important;padding:1.4rem!important;font-size:1.65rem!important}.history-duration svg{width:2.4rem!important;height:2.4rem!important}.history-duration b{font-size:2rem!important}
+.history-progress,.history-run-summary{gap:1rem!important;margin-top:1rem!important}.history-progress span,.history-run-summary span{padding:1.4rem!important;font-size:1.45rem!important}.history-progress b,.history-run-summary b{font-size:1.9rem!important}
+.history-repetitions>div{padding:1.2rem 1.4rem!important;font-size:1.6rem!important}.history-empty{padding:2rem!important;font-size:1.8rem!important}.history-clear{min-height:7rem!important;font-size:1.7rem!important}
+.mobile-sync .card-body{padding:2rem!important}.mobile-sync h2{font-size:2.3rem!important}.mobile-sync p,.mobile-sync label{font-size:1.45rem!important;line-height:1.4!important}.mobile-sync .btn{min-height:5.5rem!important;font-size:1.5rem!important}.mobile-sync .badge{max-width:none!important;padding:.6rem .9rem!important;font-size:1.25rem!important}.sync-field input{height:5rem!important;font-size:1.45rem!important}
+
+@media(max-width:640px){
+ .home-shell{height:auto!important;min-height:100dvh!important;overflow:visible!important}
+ .home-choice-grid{flex:none!important;grid-template-rows:repeat(2,minmax(17rem,38dvh))!important}
+ .home-secondary-actions{padding-bottom:1rem}
+}
