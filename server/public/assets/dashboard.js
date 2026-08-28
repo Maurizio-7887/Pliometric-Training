@@ -18,6 +18,8 @@
   const dateTime = new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium', timeStyle: 'short' });
   const number = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 });
   const integer = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 0 });
+  const athleteProfile = Object.freeze({ weightKg: 84, heightCm: 175, age: 60, sex: 'M' });
+  const PLYO_MET = 8;
   // Catalogo di riserva per mostrare anche gli esercizi delle sedute già salvate
   // prima che il telefono iniziasse a inviare il dettaglio nominale.
   const plyoCatalog = {
@@ -201,6 +203,25 @@
     }).join('');
   }
 
+  function plyoEstimate(durationSeconds) {
+    const minutes = Math.max(0, Number(durationSeconds) || 0) / 60;
+    // Stima standard MET: kcal = MET × 3,5 × kg / 200 × minuti.
+    // La pliometria vigorosa usa prevalentemente glicogeno: mostriamo una ripartizione
+    // teorica 80% carboidrati / 20% grassi, non una misura metabolica individuale.
+    const calories = PLYO_MET * 3.5 * athleteProfile.weightKg / 200 * minutes;
+    return {
+      calories: Math.round(calories),
+      carbohydratesGrams: Math.round(calories * 0.8 / 4),
+      fatGrams: Math.round(calories * 0.2 / 9),
+      load: Math.round(PLYO_MET * minutes),
+    };
+  }
+
+  function plyoEstimateMarkup(log) {
+    const estimate = plyoEstimate(log.durationSeconds);
+    return `<div class="plyo-estimates" aria-label="Stime energetiche teoriche"><div><b>${integer.format(estimate.calories)}</b><small>kcal stimate</small></div><div><b>${integer.format(estimate.carbohydratesGrams)} g</b><small>carboidrati stimati</small></div><div><b>${integer.format(estimate.fatGrams)} g</b><small>grassi stimati</small></div><div><b>${PLYO_MET} MET</b><small>intensità vigorosa</small></div><div><b>${integer.format(estimate.load)}</b><small>carico MET·min</small></div></div><div class="plyo-estimate-note">Stima standard sul profilo: uomo, 60 anni, 84 kg, 1,75 m. I grammi indicano substrati energetici teorici, non perdita di peso corporeo.</div>`;
+  }
+
   function performedExerciseMarkup(log) {
     let entries = Array.isArray(log.performedExercises)
       ? log.performedExercises.map(item => ({ name: String(item?.name || ''), completedSets: Number(item?.completedSets), plannedSets: Number(item?.plannedSets) })).filter(item => item.name && item.completedSets > 0)
@@ -254,7 +275,7 @@
         return `<div class="volume-column"><div class="volume-bar plyo-bar" style="height:${percentage}%"><b>${week.seconds ? `${integer.format(Math.round(week.seconds / 60))} min` : ''}</b></div><small>${label}</small></div>`;
       }).join('');
       const total = weeks.reduce((sum, week) => sum + week.seconds, 0);
-      $('plyo-load-total').textContent = `${integer.format(Math.round(total / 60))} min / 8 sett.`;
+      $('plyo-load-total').textContent = `${integer.format(Math.round(total / 60))} min totali · ultime 8 settimane`;
     } else $('plyo-load-total').textContent = '—';
 
     const list = $('plyo-session-list');
@@ -263,7 +284,7 @@
       const planned = Number(log.plannedSetCount);
       const done = Number(log.completedSetCount);
       const progress = Number.isFinite(planned) && planned > 0 ? `${Number.isFinite(done) ? done : 0}/${planned} serie` : 'Progresso non disponibile';
-      return `<div class="plyo-session-item"><div class="plyo-session-main"><div class="plyo-session-head"><div><div class="plyo-session-title">${escapeHtml(log.workoutTitle || 'Seduta pliometrica')}</div><div class="plyo-session-meta">${dateFormat.format(log.date)} · ${duration(Number(log.durationSeconds))} · ${progress}</div></div><span class="plyo-status ${isInterrupted ? 'is-interrupted' : 'is-complete'}">${isInterrupted ? 'INTERROTTA' : 'COMPLETATA'}</span></div><div class="plyo-exercise-heading">ESERCIZI SVOLTI</div>${performedExerciseMarkup(log)}</div></div>`;
+      return `<div class="plyo-session-item"><div class="plyo-session-main"><div class="plyo-session-head"><div><div class="plyo-session-title">${escapeHtml(log.workoutTitle || 'Seduta pliometrica')}</div><div class="plyo-session-meta">${dateFormat.format(log.date)} · ${duration(Number(log.durationSeconds))} · ${progress}</div></div><span class="plyo-status ${isInterrupted ? 'is-interrupted' : 'is-complete'}">${isInterrupted ? 'INTERROTTA' : 'COMPLETATA'}</span></div>${plyoEstimateMarkup(log)}<div class="plyo-exercise-heading">ESERCIZI SVOLTI</div>${performedExerciseMarkup(log)}</div></div>`;
     }).join('') : '<div class="empty-state">Il registro pliometria è ancora vuoto.</div>';
   }
 
