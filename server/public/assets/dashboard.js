@@ -18,6 +18,22 @@
   const dateTime = new Intl.DateTimeFormat('it-IT', { dateStyle: 'medium', timeStyle: 'short' });
   const number = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 1 });
   const integer = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 0 });
+  // Catalogo di riserva per mostrare anche gli esercizi delle sedute già salvate
+  // prima che il telefono iniziasse a inviare il dettaglio nominale.
+  const plyoCatalog = {
+    "w1d1": [["Riscaldamento dinamico",1],["Pogo jumps",3],["Squat jump",3],["Salto in lungo da fermo",3],["Calf raise esplosivo monopodalico",3],["Accelerazioni 20 m",4],["Defaticamento",1]],
+    "w1d2": [["Riscaldamento dinamico",1],["Piedi rapidi sulla linea",4],["Skater bounds",3],["Piedi rapidi laterali",4],["Accelerazione e arresto",4],["Power skip",3],["Defaticamento",1]],
+    "w1d3": [["Riscaldamento dinamico",1],["Pogo jumps",3],["Balzi alternati",3],["Salto in lungo da fermo",3],["Accelerazioni 20 m",5],["Calf raise esplosivo monopodalico",3],["Defaticamento",1]],
+    "w2d1": [["Riscaldamento dinamico",1],["Pogo jumps",4],["Squat jump",4],["Tuck jump controllato",3],["Split squat jump",3],["Accelerazioni 20 m",4],["Defaticamento",1]],
+    "w2d2": [["Riscaldamento dinamico",1],["Skater bounds",4],["Piedi rapidi laterali",5],["Piedi rapidi sulla linea",4],["Accelerazione e arresto",5],["Power skip",3],["Defaticamento",1]],
+    "w2d3": [["Riscaldamento dinamico",1],["Pogo jumps",4],["Balzi alternati",4],["Salto in lungo da fermo",4],["Sprint breve in salita",5],["Calf raise esplosivo monopodalico",3],["Defaticamento",1]],
+    "w3d1": [["Riscaldamento dinamico",1],["Pogo jumps",4],["Squat jump",4],["Tuck jump controllato",4],["Salto in lungo da fermo",4],["Accelerazioni 20 m",5],["Defaticamento",1]],
+    "w3d2": [["Riscaldamento dinamico",1],["Piedi rapidi sulla linea",5],["Piedi rapidi laterali",5],["Skater bounds",4],["Accelerazione e arresto",5],["Accelerazioni 20 m",4],["Defaticamento",1]],
+    "w3d3": [["Riscaldamento dinamico",1],["Power skip",4],["Balzi alternati",4],["Split squat jump",3],["Sprint breve in salita",6],["Calf raise esplosivo monopodalico",3],["Defaticamento",1]],
+    "w4d1": [["Riscaldamento dinamico",1],["Pogo jumps",3],["Squat jump",3],["Salto in lungo da fermo",3],["Accelerazioni 20 m",4],["Defaticamento",1]],
+    "w4d2": [["Riscaldamento dinamico",1],["Piedi rapidi sulla linea",3],["Piedi rapidi laterali",3],["Skater bounds",3],["Accelerazione e arresto",3],["Power skip",3],["Defaticamento",1]],
+    "w4d3": [["Riscaldamento dinamico",1],["Pogo jumps",3],["Salto in lungo da fermo",3],["Squat jump",3],["Accelerazioni 20 m",4],["Calf raise esplosivo monopodalico",2],["Defaticamento",1]],
+  };
 
   function pace(value) {
     if (!Number.isFinite(value) || value <= 0) return '—';
@@ -176,6 +192,31 @@
     }).join('');
   }
 
+  function performedExerciseMarkup(log) {
+    let entries = Array.isArray(log.performedExercises)
+      ? log.performedExercises.map(item => ({ name: String(item?.name || ''), completedSets: Number(item?.completedSets), plannedSets: Number(item?.plannedSets) })).filter(item => item.name && item.completedSets > 0)
+      : [];
+    if (!entries.length) {
+      const catalog = plyoCatalog[String(log.workoutId || '')];
+      if (Array.isArray(catalog)) {
+        let remaining = log.status === 'completato'
+          ? catalog.reduce((sum, item) => sum + Number(item[1] || 0), 0)
+          : Math.max(0, Number(log.completedSetCount) || 0);
+        entries = catalog.map(([name, plannedSets]) => {
+          const completedSets = Math.min(Number(plannedSets) || 0, remaining);
+          remaining -= completedSets;
+          return { name, completedSets, plannedSets };
+        }).filter(item => item.completedSets > 0);
+      }
+    }
+    if (!entries.length) return '<div class="plyo-exercise-empty">Nessun esercizio completato disponibile.</div>';
+    return `<ol class="plyo-exercise-list" aria-label="Esercizi svolti">${entries.map(item => {
+      const partial = Number.isFinite(item.plannedSets) && item.plannedSets > 0 && item.completedSets < item.plannedSets;
+      const sets = partial ? `${integer.format(item.completedSets)}/${integer.format(item.plannedSets)} serie` : `${integer.format(item.completedSets)} ${item.completedSets === 1 ? 'serie' : 'serie'}`;
+      return `<li><span>${escapeHtml(item.name)}</span><small>${sets}${partial ? ' · parziale' : ''}</small></li>`;
+    }).join('')}</ol>`;
+  }
+
   function renderPlyo(data) {
     const sessions = data.plyo;
     const completed = sessions.filter(item => item.status === 'completato');
@@ -213,7 +254,7 @@
       const planned = Number(log.plannedSetCount);
       const done = Number(log.completedSetCount);
       const progress = Number.isFinite(planned) && planned > 0 ? `${Number.isFinite(done) ? done : 0}/${planned} serie` : 'Progresso non disponibile';
-      return `<div class="plyo-session-item"><div><div class="plyo-session-title">${escapeHtml(log.workoutTitle || 'Seduta pliometrica')}</div><div class="plyo-session-meta">${dateFormat.format(log.date)} · ${duration(Number(log.durationSeconds))} · ${progress}</div></div><span class="plyo-status ${isInterrupted ? 'is-interrupted' : 'is-complete'}">${isInterrupted ? 'INTERROTTA' : 'COMPLETATA'}</span></div>`;
+      return `<div class="plyo-session-item"><div class="plyo-session-main"><div class="plyo-session-head"><div><div class="plyo-session-title">${escapeHtml(log.workoutTitle || 'Seduta pliometrica')}</div><div class="plyo-session-meta">${dateFormat.format(log.date)} · ${duration(Number(log.durationSeconds))} · ${progress}</div></div><span class="plyo-status ${isInterrupted ? 'is-interrupted' : 'is-complete'}">${isInterrupted ? 'INTERROTTA' : 'COMPLETATA'}</span></div><div class="plyo-exercise-heading">ESERCIZI SVOLTI</div>${performedExerciseMarkup(log)}</div></div>`;
     }).join('') : '<div class="empty-state">Il registro pliometria è ancora vuoto.</div>';
   }
 

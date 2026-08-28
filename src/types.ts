@@ -40,6 +40,12 @@ export interface PlyoProgress {
   completedSetCount: number;
 }
 
+export interface PerformedExercise {
+  name: string;
+  completedSets: number;
+  plannedSets: number;
+}
+
 export interface SessionLog {
   id: string;
   workoutId: string;
@@ -55,6 +61,7 @@ export interface SessionLog {
   completedExerciseCount?: number;
   plannedSetCount?: number;
   completedSetCount?: number;
+  performedExercises?: PerformedExercise[];
 }
 
 export interface Workout {
