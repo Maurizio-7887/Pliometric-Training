@@ -8,7 +8,7 @@ import { activateSpotifyElement, pauseSpotifyPlayback, playSpotifyLink, prepareS
 import { useScreenWakeLock } from '../useScreenWakeLock';
 
 type Phase = 'ready' | 'work' | 'rest' | 'done';
-interface Props { workout: Workout; checkpoint?: TimerCheckpoint | null; onCheckpoint: (checkpoint: TimerCheckpoint | null) => void; onExit: () => void; onStart: (startedAt: string) => void; onComplete: (startedAt: string, endedAt: string, status: 'completato' | 'interrotto', progress: PlyoProgress) => void; }
+interface Props { workout: Workout; checkpoint?: TimerCheckpoint | null; onCheckpoint: (checkpoint: TimerCheckpoint | null) => void; onExit: () => void; onStart: (startedAt: string) => void; onComplete: (startedAt: string, endedAt: string, status: 'completato' | 'interrotto', activeDurationSeconds: number, progress: PlyoProgress) => void; }
 
 const say = (text: string) => {
   if (!('speechSynthesis' in window)) return;
@@ -43,6 +43,23 @@ const beep = () => {
   } catch { /* audio facoltativo */ }
 };
 
+// I vecchi checkpoint non contenevano la durata attiva: la ricostruiamo dal punto raggiunto,
+// senza includere le ore o i giorni durante i quali l'app è rimasta chiusa.
+const estimateLegacyActiveMilliseconds = (workout: Workout, checkpoint: TimerCheckpoint): number => {
+  const elapsedSet = (work: number, rest: number) => 5 + work + Math.max(0, rest);
+  const beforeExercise = workout.exercises.slice(0, checkpoint.idx)
+    .reduce((total, item) => total + item.sets * elapsedSet(item.work, item.rest), 0);
+  const exercise = workout.exercises[checkpoint.idx];
+  if (!exercise) return beforeExercise * 1000;
+  const beforeSet = Math.max(0, checkpoint.setNo - 1) * elapsedSet(exercise.work, exercise.rest);
+  const current = checkpoint.phase === 'ready'
+    ? Math.max(0, 5 - checkpoint.left)
+    : checkpoint.phase === 'work'
+      ? 5 + Math.max(0, exercise.work - checkpoint.left)
+      : 5 + exercise.work + Math.max(0, exercise.rest - checkpoint.left);
+  return Math.max(0, (beforeExercise + beforeSet + current) * 1000);
+};
+
 export const GuidedTimer: React.FC<Props> = ({ workout, checkpoint, onCheckpoint, onExit, onStart, onComplete }) => {
   const restored = checkpoint?.kind === 'plyo' && checkpoint.workoutId === workout.id ? checkpoint : null;
   const [idx, setIdx] = useState(restored?.idx ?? 0);
@@ -53,13 +70,24 @@ export const GuidedTimer: React.FC<Props> = ({ workout, checkpoint, onCheckpoint
   const [resumedFromCheckpoint, setResumedFromCheckpoint] = useState(false);
   const [starting, setStarting] = useState(false);
   const startedAt = useRef<string | null>(restored?.startedAt ?? null);
+  const accumulatedActiveMilliseconds = useRef(restored ? restored.activeMilliseconds ?? estimateLegacyActiveMilliseconds(workout, restored) : 0);
+  const activeSegmentStartedAt = useRef<number | null>(null);
   const deadline = useRef(0);
   const spokenSecond = useRef(-1);
   const spotifyStarted = useRef(false);
   const finalized = useRef(false);
+  const startAttempt = useRef(0);
+  const startInFlight = useRef(false);
   const [finishedStatus, setFinishedStatus] = useState<'completato' | 'interrotto' | null>(null);
   const { acquire: keepScreenOn, release: allowScreenLock, held: screenKeptOn, supported: wakeLockSupported } = useScreenWakeLock();
   const exercise = workout.exercises[idx];
+  const activeMillisecondsNow = () => accumulatedActiveMilliseconds.current
+    + (activeSegmentStartedAt.current == null ? 0 : Math.max(0, Date.now() - activeSegmentStartedAt.current));
+  const commitActiveTime = () => {
+    accumulatedActiveMilliseconds.current = activeMillisecondsNow();
+    activeSegmentStartedAt.current = null;
+    return accumulatedActiveMilliseconds.current;
+  };
 
   useEffect(() => {
     if (isSpotifyLoggedIn() && getSpotifyLink()) void prepareSpotifyPlayer();
@@ -80,6 +108,9 @@ export const GuidedTimer: React.FC<Props> = ({ workout, checkpoint, onCheckpoint
 
   const finishSession = useCallback((status: 'completato' | 'interrotto', includeFinishedWork = false) => {
     if (finalized.current) return;
+    startAttempt.current += 1;
+    startInFlight.current = false;
+    setStarting(false);
     onCheckpoint(null);
     finalized.current = true;
     deadline.current = 0;
@@ -89,7 +120,8 @@ export const GuidedTimer: React.FC<Props> = ({ workout, checkpoint, onCheckpoint
     void allowScreenLock();
     window.speechSynthesis?.cancel();
     const endedAt = new Date().toISOString();
-    onComplete(startedAt.current ?? endedAt, endedAt, status, progressAtStop(includeFinishedWork));
+    const activeDurationSeconds = Math.max(0, Math.round(commitActiveTime() / 1000));
+    onComplete(startedAt.current ?? endedAt, endedAt, status, activeDurationSeconds, progressAtStop(includeFinishedWork));
   }, [allowScreenLock, onCheckpoint, onComplete, progressAtStop]);
 
   const next = useCallback(() => {
@@ -137,44 +169,51 @@ export const GuidedTimer: React.FC<Props> = ({ workout, checkpoint, onCheckpoint
   }, [phase, running, finishedStatus]);
 
   const start = async () => {
-    if (starting) return;
+    if (startInFlight.current || running) return;
+    startInFlight.current = true;
+    setStarting(true);
     setResumedFromCheckpoint(true);
+    const attempt = ++startAttempt.current;
     const firstStart = !startedAt.current;
     if (firstStart) {
-      setStarting(true);
       startedAt.current = new Date().toISOString();
+      activeSegmentStartedAt.current = Date.now();
       onStart(startedAt.current);
       // Entrambe le richieste partono dal gesto dell'utente: audio mobile e schermo sempre acceso.
       void keepScreenOn();
       activateSpotifyElement();
       await sayAndWait('Preparati');
-      // A termination during the spoken preparation must not restart the timer afterwards.
-      if (finalized.current) { setStarting(false); return; }
-      // Spotify NON parte qui: il countdown 5-4-3-2-1 deve restare senza musica.
-      // Il PLAY viene inviato solo al passaggio dalla fase ready alla fase work.
-      setLeft(5);
-      deadline.current = performance.now() + 5000;
-      spokenSecond.current = -1;
-      setRunning(true);
-      setStarting(false);
-    } else {
-      if (spotifyStarted.current && isSpotifyLoggedIn()) await resumeSpotifyPlayback();
-      deadline.current = performance.now() + left * 1000;
-      spokenSecond.current = -1;
-      setRunning(true);
+    } else if (spotifyStarted.current && isSpotifyLoggedIn()) {
+      await resumeSpotifyPlayback();
     }
+    // Una pausa, una chiusura o una terminazione durante l'attesa annulla questo avvio.
+    if (attempt !== startAttempt.current || finalized.current || !startedAt.current || document.visibilityState === 'hidden') {
+      if (attempt === startAttempt.current) { startInFlight.current = false; setStarting(false); }
+      return;
+    }
+    if (!firstStart) activeSegmentStartedAt.current = Date.now();
+    // Spotify parte soltanto al passaggio dalla fase ready alla fase work.
+    if (firstStart) setLeft(5);
+    deadline.current = performance.now() + (firstStart ? 5 : left) * 1000;
+    spokenSecond.current = -1;
+    setRunning(true);
+    startInFlight.current = false;
+    setStarting(false);
     void keepScreenOn();
   };
-  const saveCheckpoint = () => { if (startedAt.current && !finalized.current && phase !== 'done') onCheckpoint({ kind: 'plyo', workoutId: workout.id, startedAt: startedAt.current, idx, setNo, phase, left, savedAt: new Date().toISOString() }); };
-  const pause = () => { if (!running && !startedAt.current) return; setRunning(false); deadline.current = 0; void allowScreenLock(); if (isSpotifyLoggedIn()) void pauseSpotifyPlayback(); saveCheckpoint(); };
+  const saveCheckpoint = () => { if (startedAt.current && !finalized.current && phase !== 'done') onCheckpoint({ kind: 'plyo', workoutId: workout.id, startedAt: startedAt.current, idx, setNo, phase, left, savedAt: new Date().toISOString(), activeMilliseconds: Math.round(activeMillisecondsNow()) }); };
+  const pause = () => { if (!running && !startedAt.current) return; startAttempt.current += 1; startInFlight.current = false; setStarting(false); commitActiveTime(); setRunning(false); deadline.current = 0; void allowScreenLock(); if (isSpotifyLoggedIn()) void pauseSpotifyPlayback(); saveCheckpoint(); };
+  // Salva continuamente esercizio, serie, fase e durata: anche una chiusura improvvisa riparte dal punto corretto.
+  useEffect(() => { if (startedAt.current && !finalized.current && phase !== 'done') saveCheckpoint(); }, [idx, setNo, phase, left, running]);
   useEffect(() => { const background = () => pause(); const visibility = () => { if (document.visibilityState === 'hidden') background(); }; document.addEventListener('visibilitychange', visibility); window.addEventListener('pagehide', background); return () => { document.removeEventListener('visibilitychange', visibility); window.removeEventListener('pagehide', background); }; }, [pause]);
-  const reset = () => { if (startedAt.current && !finalized.current) { const endedAt = new Date().toISOString(); onComplete(startedAt.current, endedAt, 'interrotto', progressAtStop()); } startedAt.current = null; finalized.current = false; setResumedFromCheckpoint(false); onCheckpoint(null); setRunning(false); setStarting(false); setIdx(0); setSetNo(1); setPhase('ready'); setLeft(5); deadline.current = 0; spokenSecond.current = -1; spotifyStarted.current = false; void allowScreenLock(); if (isSpotifyLoggedIn()) void pauseSpotifyPlayback(); window.speechSynthesis?.cancel(); };
+  const reset = () => { startAttempt.current += 1; startInFlight.current = false; if (startedAt.current && !finalized.current) { const endedAt = new Date().toISOString(); const activeDurationSeconds = Math.max(0, Math.round(commitActiveTime() / 1000)); onComplete(startedAt.current, endedAt, 'interrotto', activeDurationSeconds, progressAtStop()); } startedAt.current = null; accumulatedActiveMilliseconds.current = 0; activeSegmentStartedAt.current = null; finalized.current = false; setResumedFromCheckpoint(false); onCheckpoint(null); setRunning(false); setStarting(false); setIdx(0); setSetNo(1); setPhase('ready'); setLeft(5); deadline.current = 0; spokenSecond.current = -1; spotifyStarted.current = false; void allowScreenLock(); if (isSpotifyLoggedIn()) void pauseSpotifyPlayback(); window.speechSynthesis?.cancel(); };
   const terminateEarly = () => {
     if (!startedAt.current || finalized.current) return;
     if (window.confirm('Terminare prima l’allenamento? Verrà salvato come interrotto e non sbloccherà la prossima seduta.')) finishSession('interrotto');
   };
   const exitTimer = () => {
-    if (startedAt.current && !finalized.current) { terminateEarly(); return; }
+    // Uscire sospende la seduta e conserva il punto raggiunto; solo “TERMINA PRIMA” la chiude definitivamente.
+    if (startedAt.current && !finalized.current) pause();
     void allowScreenLock(); window.speechSynthesis?.cancel(); onExit();
   };
 
@@ -183,7 +222,7 @@ export const GuidedTimer: React.FC<Props> = ({ workout, checkpoint, onCheckpoint
   const duration = phase === 'work' ? exercise.work : phase === 'rest' ? exercise.rest : 5;
   const pct = Math.max(0, Math.round(left / duration * 100));
   return <div className="guided-timer min-h-screen flex flex-col gap-4 pb-5">
-    <div className="flex justify-between items-center"><button className="btn btn-ghost btn-sm" onClick={exitTimer}><ArrowLeft size={18} /> Esci</button><span className="badge badge-outline">{idx + 1}/{workout.exercises.length}</span>{getSpotifyLink() && <button className="btn btn-ghost btn-sm btn-circle" onClick={openSpotify} aria-label="Apri Spotify"><Music size={18} /></button>}</div>
+    <div className="flex justify-between items-center"><button className="btn btn-ghost btn-sm" onClick={exitTimer}><ArrowLeft size={18} /> {startedAt.current && !finalized.current ? 'Sospendi' : 'Esci'}</button><span className="badge badge-outline">{idx + 1}/{workout.exercises.length}</span>{getSpotifyLink() && <button className="btn btn-ghost btn-sm btn-circle" onClick={openSpotify} aria-label="Apri Spotify"><Music size={18} /></button>}</div>
     {restored && !resumedFromCheckpoint && !running && <div className="alert alert-info text-sm">Seduta ripristinata in pausa: premi RIPRENDI per continuare.</div>}
     <div className={`guided-main-card card ${phase === 'work' ? 'bg-primary text-primary-content' : phase === 'rest' ? 'bg-secondary text-secondary-content' : 'bg-base-200'}`}><div className="guided-main-body card-body p-5 items-center text-center"><div><span className="badge badge-lg">{phase === 'ready' ? 'CONTO ALLA ROVESCIA' : phase === 'work' ? 'LAVORO' : 'RECUPERO'}</span><h2 className="text-2xl font-bold mt-3">{exercise.name}</h2><p className="opacity-80">Serie {setNo} di {exercise.sets} · {exercise.prescription}</p></div><MovementAnimation kind={exercise.kind} active={running} id={exercise.id} /><div><div className="font-mono text-7xl font-black tabular-nums">{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</div><progress className="progress w-full mt-3" value={pct} max="100" /><p className="mt-3 font-medium">{exercise.cues.join(' · ')}</p></div></div></div>
     <div className="guided-controls grid grid-cols-4 gap-2"><button className="btn btn-ghost" onClick={reset}><RotateCcw /></button><button className="guided-start btn btn-primary col-span-2 btn-lg" disabled={starting} onClick={() => running ? pause() : void start()}>{starting ? <><Volume2 /> PREPARATI…</> : running ? <><Pause /> PAUSA</> : <><Play /> {startedAt.current ? 'RIPRENDI' : 'START'}</>}</button><button className="btn btn-ghost" onClick={next}><SkipForward /></button></div>
