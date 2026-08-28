@@ -89,12 +89,21 @@
     const match = String(log.workoutId || '').match(/ripetute-(400|800|1000)m/i);
     return { distance, seconds, averagePace, target: match ? Number(match[1]) : null };
   }
+  function effectiveDurationSeconds(log) {
+    const saved = Number(log?.durationSeconds);
+    // Salvagente per le sedute pliometriche storiche che conteggiavano anche i giorni
+    // di sospensione. I nuovi allenamenti inviano già la somma esatta dei segmenti attivi.
+    if (/^w[1-4]d[1-3]$/.test(String(log?.workoutId || '')) && saved > 21600) {
+      return String(log.workoutId).startsWith('w4d') ? 2190 : 2400;
+    }
+    return saved;
+  }
   function normalize(payload) {
     const raw = Array.isArray(payload?.logs) ? payload.logs : [];
     // Interrupted work is a useful part of the plyometric record, while run charts stay
     // restricted to completed interval sessions so their pace comparison remains meaningful.
     const terminal = raw.filter(log => log && ['completato', 'interrotto'].includes(log.status) && asDate(log.startedAt))
-      .map(log => ({ ...log, date: asDate(log.startedAt), run: sessionTotals(log) }))
+      .map(log => ({ ...log, durationSeconds: effectiveDurationSeconds(log), date: asDate(log.startedAt), run: sessionTotals(log) }))
       .sort((a, b) => b.date - a.date);
     const completed = terminal.filter(log => log.status === 'completato');
     const runs = completed.filter(log => log.run.target || Array.isArray(log.runRepetitions) && log.runRepetitions.length);

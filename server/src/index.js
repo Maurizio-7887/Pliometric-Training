@@ -74,6 +74,25 @@ async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS pairing_codes_expires_at_idx ON pairing_codes (expires_at);
     CREATE TABLE IF NOT EXISTS pairing_attempt_limits (scope TEXT PRIMARY KEY, window_started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), attempts INTEGER NOT NULL DEFAULT 0);
     CREATE TABLE IF NOT EXISTS pairing_code_attempts (code_hash TEXT PRIMARY KEY, attempts SMALLINT NOT NULL DEFAULT 0, last_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+    -- Le vecchie sedute pliometriche concluse dopo giorni di sospensione potevano
+    -- includere l'intero tempo di calendario. Non esistendo segmenti attivi storici,
+    -- le riportiamo alla durata nominale del programma (40 min; 36,5 min nello scarico).
+    UPDATE workout_sessions
+    SET duration_seconds = CASE WHEN workout_id LIKE 'w4d%' THEN 2190 ELSE 2400 END,
+        payload = jsonb_set(
+          payload,
+          '{durationSeconds}',
+          to_jsonb(CASE WHEN workout_id LIKE 'w4d%' THEN 2190 ELSE 2400 END),
+          TRUE
+        ),
+        updated_at = NOW()
+    WHERE workout_id ~ '^w[1-4]d[1-3]$'
+      AND status IN ('completato', 'interrotto')
+      AND GREATEST(
+        COALESCE(duration_seconds, 0),
+        CASE WHEN jsonb_typeof(payload->'durationSeconds') = 'number'
+          THEN (payload->>'durationSeconds')::NUMERIC ELSE 0 END
+      ) > 21600;
     -- Dedicated v2 tables avoid any incompatible schema left by an earlier
     -- partial deployment. They contain pairing data only, never workouts.
     CREATE TABLE IF NOT EXISTS pairing_v2_codes (
