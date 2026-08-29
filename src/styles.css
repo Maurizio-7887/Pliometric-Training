@@ -50,7 +50,7 @@ html { scroll-behavior: smooth; width: 100%; min-width: 100%; } body { min-heigh
 /* RIPETUTE — layout realmente mobile, con immagini diverse per corsa e recupero. */
 .run-shell{min-height:100dvh;padding:.55rem!important;display:flex;flex-direction:column;gap:.55rem;background:var(--color-base-100)}
 .run-back{align-self:flex-start;min-height:2.65rem;font-size:.95rem}
-.run-setup-hero{position:relative;flex:1 1 auto;min-height:150px;height:23dvh;max-height:46dvh;overflow:hidden;border-radius:.7rem;background:#18211c;box-shadow:0 5px 18px rgba(0,0,0,.16)}
+.run-setup-hero{position:relative;min-height:130px;height:19dvh;max-height:220px;overflow:hidden;border-radius:.7rem;background:#18211c;box-shadow:0 5px 18px rgba(0,0,0,.16)}
 .run-setup-hero img,.run-phase-photo img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 44%}
 .run-setup-overlay{position:absolute;inset:auto 0 0;padding:1.9rem 1rem .8rem;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.86))}
 .run-setup-overlay h2{margin:0;font-size:1.5rem;line-height:1.05;font-weight:900}
@@ -59,9 +59,9 @@ html { scroll-behavior: smooth; width: 100%; min-width: 100%; } body { min-heigh
 .run-settings label{display:flex;min-width:0;flex-direction:column;gap:.3rem}
 .run-settings label span{font-size:.7rem;line-height:1.1;font-weight:900;letter-spacing:.035em;color:color-mix(in srgb,var(--color-base-content) 68%,transparent)}
 .run-settings input{width:100%;height:3rem;border:1px solid color-mix(in srgb,var(--color-base-content) 22%,transparent);border-radius:.4rem;padding:.4rem .5rem;background:var(--color-base-100);color:var(--color-base-content);font-size:1.15rem;font-weight:800}
-.run-programs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem}
-.run-program{min-width:0;min-height:8.6rem;padding:.85rem .5rem;border:2px solid transparent;border-radius:.8rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.4rem;background:var(--color-base-200);color:var(--color-base-content);text-align:center}
-.run-program strong{font-size:1.75rem;line-height:1.1;font-weight:900}.run-program span{font-size:.95rem;line-height:1.3}.run-program small{font-size:.88rem;line-height:1.25;font-weight:800;color:var(--color-primary)}
+.run-programs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem;flex:1 1 auto}
+.run-program{min-width:0;padding:.6rem .4rem;border:2px solid transparent;border-radius:.9rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.5rem;background:var(--color-base-200);color:var(--color-base-content);text-align:center}
+.run-program strong{font-size:2.6rem;line-height:1.05;font-weight:900}.run-program span{font-size:1.15rem;line-height:1.3}.run-program small{font-size:1.05rem;line-height:1.25;font-weight:800;color:var(--color-primary)}
 .run-program.is-selected{border-color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 15%,var(--color-base-100));box-shadow:0 3px 12px rgba(0,0,0,.1)}
 .run-fixed-note{margin:.7rem 0 0;font-size:.85rem;font-weight:700;opacity:.65}
 .run-music{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.65rem;padding:.6rem .7rem;border-radius:.55rem;background:#191414;color:#fff}
@@ -98,8 +98,7 @@ html { scroll-behavior: smooth; width: 100%; min-width: 100%; } body { min-heigh
   .run-shell{padding:.4rem!important;gap:.4rem}
   .run-setup-hero{min-height:120px;height:18dvh}
   .run-setup-overlay h2{font-size:1.3rem}
-  .run-program{min-height:7.6rem}
-  .run-program strong{font-size:1.5rem}
+  .run-program strong{font-size:2.2rem}
   .run-settings{gap:.35rem;padding:.5rem}
   .run-settings label span{font-size:.62rem}
   .run-settings input{height:2.65rem;font-size:1rem}
