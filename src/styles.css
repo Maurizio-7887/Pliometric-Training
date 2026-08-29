@@ -50,18 +50,18 @@ html { scroll-behavior: smooth; width: 100%; min-width: 100%; } body { min-heigh
 /* RIPETUTE — layout realmente mobile, con immagini diverse per corsa e recupero. */
 .run-shell{min-height:100dvh;padding:.55rem!important;display:flex;flex-direction:column;gap:.55rem;background:var(--color-base-100)}
 .run-back{align-self:flex-start;min-height:2.65rem;font-size:.95rem}
-.run-setup-hero{position:relative;min-height:210px;height:31dvh;max-height:340px;overflow:hidden;border-radius:.7rem;background:#18211c;box-shadow:0 5px 18px rgba(0,0,0,.16)}
+.run-setup-hero{position:relative;min-height:150px;height:23dvh;max-height:280px;overflow:hidden;border-radius:.7rem;background:#18211c;box-shadow:0 5px 18px rgba(0,0,0,.16)}
 .run-setup-hero img,.run-phase-photo img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 44%}
-.run-setup-overlay{position:absolute;inset:auto 0 0;padding:2.8rem 1rem .9rem;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.86))}
-.run-setup-overlay h2{margin:0;font-size:1.65rem;line-height:1.05;font-weight:900}
-.run-setup-overlay p{margin:.25rem 0 0;font-size:.92rem;opacity:.9}
+.run-setup-overlay{position:absolute;inset:auto 0 0;padding:1.9rem 1rem .8rem;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.86))}
+.run-setup-overlay h2{margin:0;font-size:1.5rem;line-height:1.05;font-weight:900}
+.run-setup-overlay p{margin:.25rem 0 0;font-size:.88rem;opacity:.9}
 .run-settings{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;padding:.65rem;border-radius:.6rem;background:var(--color-base-200)}
 .run-settings label{display:flex;min-width:0;flex-direction:column;gap:.3rem}
 .run-settings label span{font-size:.7rem;line-height:1.1;font-weight:900;letter-spacing:.035em;color:color-mix(in srgb,var(--color-base-content) 68%,transparent)}
 .run-settings input{width:100%;height:3rem;border:1px solid color-mix(in srgb,var(--color-base-content) 22%,transparent);border-radius:.4rem;padding:.4rem .5rem;background:var(--color-base-100);color:var(--color-base-content);font-size:1.15rem;font-weight:800}
-.run-programs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.45rem}
-.run-program{min-width:0;min-height:5.6rem;padding:.6rem .4rem;border:2px solid transparent;border-radius:.6rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.18rem;background:var(--color-base-200);color:var(--color-base-content);text-align:center}
-.run-program strong{font-size:1rem;line-height:1.05}.run-program span{font-size:.69rem;line-height:1.15;opacity:.72}.run-program small{font-size:.66rem;line-height:1.15;font-weight:800;color:var(--color-primary)}
+.run-programs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem}
+.run-program{min-width:0;min-height:7.2rem;padding:.7rem .45rem;border:2px solid transparent;border-radius:.7rem;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.3rem;background:var(--color-base-200);color:var(--color-base-content);text-align:center}
+.run-program strong{font-size:1.4rem;line-height:1.1;font-weight:900}.run-program span{font-size:.82rem;line-height:1.25}.run-program small{font-size:.78rem;line-height:1.2;font-weight:800;color:var(--color-primary)}
 .run-program.is-selected{border-color:var(--color-primary);background:color-mix(in srgb,var(--color-primary) 15%,var(--color-base-100));box-shadow:0 3px 12px rgba(0,0,0,.1)}
 .run-fixed-note{margin:.7rem 0 0;font-size:.85rem;font-weight:700;opacity:.65}
 .run-music{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.65rem;padding:.6rem .7rem;border-radius:.55rem;background:#191414;color:#fff}
@@ -96,8 +96,10 @@ html { scroll-behavior: smooth; width: 100%; min-width: 100%; } body { min-heigh
 
 @media (max-width:380px){
   .run-shell{padding:.4rem!important;gap:.4rem}
-  .run-setup-hero{min-height:185px;height:28dvh}
-  .run-setup-overlay h2{font-size:1.45rem}
+  .run-setup-hero{min-height:120px;height:18dvh}
+  .run-setup-overlay h2{font-size:1.3rem}
+  .run-program{min-height:6.5rem}
+  .run-program strong{font-size:1.25rem}
   .run-settings{gap:.35rem;padding:.5rem}
   .run-settings label span{font-size:.62rem}
   .run-settings input{height:2.65rem;font-size:1rem}
