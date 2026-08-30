@@ -124,6 +124,9 @@ html { scroll-behavior: smooth; width: 100%; min-width: 100%; } body { min-heigh
 .guided-main-body{gap:.75rem;justify-content:center}
 .guided-main-body>div{width:100%}
 .guided-main-body>.move-stage{width:100%;max-width:46rem}
+.guided-instructions{display:none}
+@media (min-height:680px){.guided-instructions{display:block;margin-top:.6rem;font-size:.9rem;line-height:1.4;opacity:.85}}
+@media (min-height:800px){.guided-instructions{font-size:1rem}}
 .guided-controls{margin-top:.1rem;gap:.5rem!important}
 .guided-controls .btn{min-height:4.6rem}
 .guided-start{min-height:4.6rem;font-size:1.5rem;border-radius:.55rem}
